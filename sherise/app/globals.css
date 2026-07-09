@@ -1,0 +1,230 @@
+@import url('https://fonts.googleapis.com/css2?family=Fraunces:wght@400;500;600&family=Inter:wght@40...');
+@import "tailwindcss";
+
+@theme {
+  /* Colors */
+  --color-bg: #f5f7f2;
+  --color-surface: #ffffff;
+  --color-primary: #2e7d5b;
+  --color-primary-light: #8fbf9f;
+  --color-accent-gold: #e3a857;
+  --color-accent-plum: #8b4a6b;
+  --color-text: #1e2a24;
+  --color-text-muted: #5c6b62;
+  --color-border: #e3e8df;
+}
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  font-family: 'Inter', ui-sans-serif, sans-serif;
+  background-color: #f5f7f2;
+  color: #1e2a24;
+  font-size: 16px;
+  line-height: 1.6;
+}
+
+/* Claymorphism utility classes */
+.clay-card {
+  background: #ffffff;
+  border-radius: 24px;
+  box-shadow: 
+    8px 8px 20px rgba(30, 42, 36, 0.08),
+    -4px -4px 12px rgba(255, 255, 255, 0.9);
+}
+
+.clay-button {
+  background: #2e7d5b;
+  border-radius: 16px;
+  box-shadow: 
+    4px 4px 12px rgba(46, 125, 91, 0.3),
+    -2px -2px 8px rgba(255, 255, 255, 0.5);
+  transition: all 0.2s ease;
+  cursor: pointer;
+  border: none;
+  color: white;
+}
+
+.clay-button:hover {
+  box-shadow: 
+    6px 6px 16px rgba(46, 125, 91, 0.4),
+    -3px -3px 10px rgba(255, 255, 255, 0.6);
+  transform: translateY(-2px);
+}
+
+.clay-stone {
+  background: #ffffff;
+  border-radius: 20px;
+  box-shadow: 
+    6px 6px 16px rgba(30, 42, 36, 0.12),
+    -4px -4px 12px rgba(255, 255, 255, 1),
+    inset 2px 2px 4px rgba(255, 255, 255, 0.5);
+}
+
+/* Font utilities */
+.font-display {
+  font-family: 'Fraunces', ui-serif, serif;
+}
+
+.font-body {
+  font-family: 'Inter', ui-sans-serif, sans-serif;
+}
+
+.font-mono {
+  font-family: 'Space Mono', ui-monospace, monospace;
+}
+
+/* Text colors */
+.text-text {
+  color: #1e2a24;
+}
+
+.text-text-muted {
+  color: #5c6b62;
+}
+
+.text-primary {
+  color: #2e7d5b;
+}
+
+.text-accent-gold {
+  color: #e3a857;
+}
+
+.text-accent-plum {
+  color: #8b4a6b;
+}
+
+/* Background colors */
+.bg-primary {
+  background-color: #2e7d5b;
+}
+
+.bg-primary-light {
+  background-color: #8fbf9f;
+}
+
+.bg-accent-gold {
+  background-color: #e3a857;
+}
+
+.bg-accent-plum {
+  background-color: #8b4a6b;
+}
+
+.bg-bg {
+  background-color: #f5f7f2;
+}
+
+.bg-surface {
+  background-color: #ffffff;
+}
+
+/* Border colors */
+.border-primary {
+  border-color: #2e7d5b;
+}
+
+.border-primary-light {
+  border-color: #8fbf9f;
+}
+
+.border-border {
+  border-color: #e3e8df;
+}
+
+.border-accent-plum {
+  border-color: #8b4a6b;
+}
+
+/* Ring colors */
+.ring-primary {
+  --tw-ring-color: #2e7d5b;
+}
+
+.ring-primary-light {
+  --tw-ring-color: #8fbf9f;
+}
+
+/* Opacity variations */
+.bg-primary\/5 {
+  background-color: rgba(46, 125, 91, 0.05);
+}
+
+.bg-primary\/10 {
+  background-color: rgba(46, 125, 91, 0.1);
+}
+
+.bg-primary\/20 {
+  background-color: rgba(46, 125, 91, 0.2);
+}
+
+.bg-primary-light\/10 {
+  background-color: rgba(143, 191, 159, 0.1);
+}
+
+.bg-accent-gold\/10 {
+  background-color: rgba(227, 168, 87, 0.1);
+}
+
+.bg-accent-gold\/20 {
+  background-color: rgba(227, 168, 87, 0.2);
+}
+
+.bg-accent-plum\/5 {
+  background-color: rgba(139, 74, 107, 0.05);
+}
+
+.bg-accent-plum\/10 {
+  background-color: rgba(139, 74, 107, 0.1);
+}
+
+.bg-accent-plum\/20 {
+  background-color: rgba(139, 74, 107, 0.2);
+}
+
+/* Hover states */
+.hover\:bg-primary\/10:hover {
+  background-color: rgba(46, 125, 91, 0.1);
+}
+
+.hover\:bg-primary\/20:hover {
+  background-color: rgba(46, 125, 91, 0.2);
+}
+
+.hover\:text-text:hover {
+  color: #1e2a24;
+}
+
+.hover\:border-primary-light:hover {
+  border-color: #8fbf9f;
+}
+
+.hover\:underline:hover {
+  text-decoration: underline;
+}
+
+.hover\:ring-2:hover {
+  --tw-ring-offset-shadow: var(--tw-ring-inset) 0 0 0 var(--tw-ring-offset-width) var(--tw-ring-offset-color);
+  --tw-ring-shadow: var(--tw-ring-inset) 0 0 0 calc(2px + var(--tw-ring-offset-width)) var(--tw-ring-color);
+  box-shadow: var(--tw-ring-offset-shadow), var(--tw-ring-shadow), var(--tw-shadow, 0 0 #0000);
+}
+
+/* Focus states */
+.focus\:outline-none:focus {
+  outline: none;
+}
+
+.focus\:ring-2:focus {
+  --tw-ring-offset-shadow: var(--tw-ring-inset) 0 0 0 var(--tw-ring-offset-width) var(--tw-ring-offset-color);
+  --tw-ring-shadow: var(--tw-ring-inset) 0 0 0 calc(2px + var(--tw-ring-offset-width)) var(--tw-ring-color);
+  box-shadow: var(--tw-ring-offset-shadow), var(--tw-ring-shadow), var(--tw-shadow, 0 0 #0000);
+}
+
+.focus\:ring-primary:focus {
+  --tw-ring-color: #2e7d5b;
+}
