@@ -14,9 +14,12 @@ const menuItems = [
   { id: "settings", label: "Settings", icon: "⚙️", active: false },
 ];
 
-export default function Sidebar() {
+export default function Sidebar({ user }: { user?: { name: string; level: number; xp: number; maxXp: number } }) {
   const router = useRouter();
   const [activeItem, setActiveItem] = useState("dashboard");
+
+  const displayUser = user || { name: "User", level: 1, xp: 0, maxXp: 1000 };
+  const userInitial = displayUser.name?.charAt(0)?.toUpperCase() || "U";
 
   const handleNavigation = (itemId: string) => {
     setActiveItem(itemId);
@@ -134,25 +137,25 @@ export default function Sidebar() {
             {/* User Profile */}
             <div className="flex items-center space-x-3 mb-4">
               <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-purple-400 to-pink-400 flex items-center justify-center text-white text-lg font-semibold shadow-lg">
-                P
+                {userInitial}
               </div>
               <div className="flex-1">
-                <p className="font-semibold text-gray-800 text-sm">Priya</p>
-                <p className="text-xs text-gray-500">Level 2 • Beginner</p>
+                <p className="font-semibold text-gray-800 text-sm">{displayUser.name}</p>
+                <p className="text-xs text-gray-500">Level {displayUser.level} • Beginner</p>
               </div>
             </div>
 
             {/* XP Progress */}
             <div className="space-y-2">
               <div className="flex justify-between text-xs text-gray-600">
-                <span>150 XP</span>
-                <span>1000 XP</span>
+                <span>{displayUser.xp} XP</span>
+                <span>{displayUser.maxXp} XP</span>
               </div>
               <div className="w-full h-2 bg-gray-200 rounded-full overflow-hidden">
                 <motion.div
                   className="h-full bg-gradient-to-r from-purple-500 to-pink-500 rounded-full"
                   initial={{ width: 0 }}
-                  animate={{ width: "15%" }}
+                  animate={{ width: `${(displayUser.xp / displayUser.maxXp) * 100}%` }}
                   transition={{ delay: 1, duration: 1, ease: "easeOut" }}
                 />
               </div>

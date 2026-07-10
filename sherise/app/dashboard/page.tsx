@@ -89,6 +89,13 @@ export default function Dashboard() {
     }
 
     loadDashboardData();
+    
+    // Refresh data every 5 seconds to pick up changes
+    const interval = setInterval(() => {
+      loadDashboardData();
+    }, 5000);
+    
+    return () => clearInterval(interval);
   }, [isLoaded, clerkUser, router]);
 
   const loadDashboardData = async () => {
@@ -294,7 +301,7 @@ export default function Dashboard() {
 
       {/* Main Layout */}
       <div className="flex">
-        <Sidebar />
+        <Sidebar user={{ name: dashboardData.user.name, level: dashboardData.user.level, xp: dashboardData.user.xp, maxXp: dashboardData.user.maxXp }} />
 
         <div className="flex-1 ml-80">
           <TopNavbar user={{ name: dashboardData.user.name, avatar: dashboardData.user.imageUrl || '' }} />
