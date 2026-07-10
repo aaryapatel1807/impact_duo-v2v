@@ -10,10 +10,13 @@ datasource db {
   provider = "postgresql"
 }
 
+// User model synced with Clerk
 model User {
-  id        String   @id @default(cuid())
-  name      String
+  id        String   @id // Clerk User ID (e.g., user_2abc123...)
   email     String   @unique
+  name      String
+  imageUrl  String?
+  username  String?
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -23,6 +26,7 @@ model User {
   generatedContents   GeneratedContent[]
   opportunityMatches  OpportunityMatch[]
   progressLogs        ProgressLog[]
+  savedOpportunities  SavedOpportunity[]
 
   @@map("users")
 }
@@ -50,8 +54,10 @@ model Profile {
 model Roadmap {
   id                String   @id @default(cuid())
   currentSituation  String
-  steps             Json     // Array of {title, description, icon, status}
+  steps             Json     // Array of {title, description, icon, status, completed}
   timelineMonths    String
+  completionPercent Int      @default(0)
+  currentStep       Int      @default(0)
   
   userId    String
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -79,6 +85,7 @@ model GeneratedContent {
   resumeSummary  String
   bio            String
   elevatorPitch  String
+  atsScore       Int    @default(0)
   
   userId    String   @unique
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -101,17 +108,19 @@ model Opportunity {
   tags         String[] // Skills or interests tags
   url          String
   deadline     String?
+  funding      String?
   
   createdAt DateTime @default(now())
   
   opportunityMatches OpportunityMatch[]
+  savedOpportunities SavedOpportunity[]
 
   @@map("opportunities")
 }
 
 model OpportunityMatch {
-  id     String @id @default(cuid())
-  status String // "eligible" | "almost" | "future"
+  id              String   @id @default(cuid())
+  status          String   // "eligible" | "almost" | "future"
   missingCriteria String[] // Array of missing criteria for "almost" status
   
   userId        String
@@ -125,6 +134,22 @@ model OpportunityMatch {
   @@map("opportunity_matches")
 }
 
+model SavedOpportunity {
+  id            String      @id @default(cuid())
+  userId        String
+  user          User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  opportunityId String
+  opportunity   Opportunity @relation(fields: [opportunityId], references: [id], onDelete: Cascade)
+  appliedAt     DateTime?
+  status        String      @default("saved") // "saved" | "applied" | "accepted" | "rejected"
+  notes         String?
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+
+  @@unique([userId, opportunityId])
+  @@map("saved_opportunities")
+}
+
 model ProgressLog {
   id               String   @id @default(cuid())
   date             DateTime @default(now())
@@ -132,9 +157,22 @@ model ProgressLog {
   confidenceScore  Int      @default(5)
   streakCount      Int      @default(0)
   currentStepIndex Int      @default(0) // Which step in the roadmap they're on
+  xpEarned         Int      @default(0)
   
   userId String
   user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@map("progress_logs")
+}
+
+model Achievement {
+  id          String   @id @default(cuid())
+  userId      String
+  title       String
+  description String
+  icon        String
+  earnedAt    DateTime @default(now())
+  category    String   // "milestone" | "streak" | "skill" | "application"
+
+  @@map("achievements")
 }

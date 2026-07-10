@@ -1,15 +1,15 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
+import { requireAuth } from '@/lib/auth';
 
-export async function GET(
-  request: NextRequest,
-  { params }: { params: Promise<{ userId: string }> }
-) {
+export async function GET() {
   try {
-    const { userId } = await params;
+    // Get authenticated user
+    const authUser = await requireAuth();
 
+    // Fetch user profile
     const user = await prisma.user.findUnique({
-      where: { id: userId },
+      where: { id: authUser.id },
       include: {
         profile: true,
       },
@@ -31,7 +31,10 @@ export async function GET(
         id: user.id,
         name: user.name,
         email: user.email,
+        imageUrl: user.imageUrl,
+        username: user.username,
         profile: user.profile,
+        createdAt: user.createdAt,
       },
     });
   } catch (error) {
@@ -39,7 +42,7 @@ export async function GET(
     return NextResponse.json(
       {
         success: false,
-        error: 'Failed to fetch profile',
+        error: error instanceof Error ? error.message : 'Failed to fetch profile',
       },
       { status: 500 }
     );

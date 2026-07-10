@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { motion } from "framer-motion";
 import { useRouter } from "next/navigation";
-import { markOnboardingComplete } from "@/lib/profile-client";
+import { useUser } from "@clerk/nextjs";
 
 interface OnboardingData {
   age: string;
@@ -19,6 +19,7 @@ interface OnboardingData {
 
 export default function Onboarding() {
   const router = useRouter();
+  const { user, isLoaded } = useUser();
   const [formData, setFormData] = useState<OnboardingData>({
     age: "",
     country: "",
@@ -32,15 +33,49 @@ export default function Onboarding() {
   });
 
   const [currentStep, setCurrentStep] = useState(0);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const totalSteps = 5;
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    // Store in localStorage for demo purposes
-    localStorage.setItem("userData", JSON.stringify(formData));
-    // Mark onboarding as complete
-    markOnboardingComplete();
-    router.push("/dashboard");
+    
+    if (!isLoaded || !user) {
+      alert("Please sign in to continue");
+      return;
+    }
+
+    setIsSubmitting(true);
+
+    try {
+      // Save profile to database using authenticated user
+      const response = await fetch("/api/profile", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          age: parseInt(formData.age),
+          country: formData.country,
+          educationLevel: formData.education,
+          reasonStopped: formData.reasonStopped,
+          skills: formData.skills,
+          interests: formData.interests,
+          hoursPerDay: formData.hoursPerDay,
+          internetAvailability: formData.internetAvailability,
+          careerGoal: formData.careerGoal,
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error("Failed to save profile");
+      }
+
+      // Success! Redirect to dashboard
+      router.push("/dashboard");
+    } catch (error) {
+      console.error("Error saving profile:", error);
+      alert("Failed to save your profile. Please try again.");
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const handleChange = (
@@ -63,7 +98,45 @@ export default function Onboarding() {
 
   return (
     <div className="min-h-screen py-12 px-6">
-      <div className="max-w-2xl mx-auto">
+      {/* Show loading while checking auth */}
+      {!isLoaded && (
+        <div className="min-h-screen flex items-center justify-center">
+          <div className="text-center">
+            <div className="w-16 h-16 border-4 border-purple-500 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+            <p className="text-gray-600">Loading...</p>
+          </div>
+        </div>
+      )}
+
+      {/* Require authentication */}
+      {isLoaded && !user && (
+        <div className="min-h-screen flex items-center justify-center">
+          <div className="text-center max-w-md">
+            <h2 className="text-2xl font-bold text-gray-800 mb-4">Authentication Required</h2>
+            <p className="text-gray-600 mb-6">Please sign in to complete your onboarding.</p>
+            <button
+              onClick={() => router.push("/")}
+              className="clay-button px-8 py-3 text-white font-body font-medium"
+            >
+              Go to Home
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Show form when authenticated */}
+      {isLoaded && user && (
+        <div className="max-w-2xl mx-auto">
+          {/* User greeting */}
+          <motion.div
+            className="text-center mb-4"
+            initial={{ opacity: 0, y: -10 }}
+            animate={{ opacity: 1, y: 0 }}
+          >
+            <p className="text-sm text-gray-500">
+              Welcome, {user.firstName || user.emailAddresses[0]?.emailAddress}!
+            </p>
+          </motion.div>
         {/* Header */}
         <motion.div
           className="text-center mb-8"
@@ -360,15 +433,17 @@ export default function Onboarding() {
               ) : (
                 <button
                   type="submit"
-                  className="clay-button px-8 py-3 text-white font-body font-medium"
+                  disabled={isSubmitting}
+                  className="clay-button px-8 py-3 text-white font-body font-medium disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  Create My Roadmap
+                  {isSubmitting ? "Creating Your Profile..." : "Create My Roadmap"}
                 </button>
               )}
             </div>
           </form>
         </motion.div>
       </div>
+      )}
     </div>
   );
 }

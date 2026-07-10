@@ -2,9 +2,55 @@
 
 import { motion } from "framer-motion";
 import { useRouter } from "next/navigation";
+import { SignedIn, SignedOut, SignInButton, UserButton, useUser } from "@clerk/nextjs";
 
 export default function Home() {
   const router = useRouter();
+  const { isLoaded, user } = useUser();
+
+  return (
+    <div className="min-h-screen relative overflow-hidden">
+      {/* Top Navigation Bar */}
+      <nav className="absolute top-0 left-0 right-0 z-20 p-6">
+        <div className="container mx-auto flex justify-between items-center">
+          <div className="text-2xl font-bold bg-gradient-to-r from-purple-600 to-pink-600 bg-clip-text text-transparent">
+            SheRise
+          </div>
+          
+          <div className="flex items-center gap-4">
+            <SignedOut>
+              <SignInButton mode="modal">
+                <motion.button
+                  className="px-6 py-2 rounded-xl bg-white/80 backdrop-blur-sm border border-purple-200 text-purple-700 font-medium hover:bg-white transition-all"
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.95 }}
+                >
+                  Sign In
+                </motion.button>
+              </SignInButton>
+            </SignedOut>
+            
+            <SignedIn>
+              <motion.button
+                onClick={() => router.push("/dashboard")}
+                className="px-6 py-2 rounded-xl bg-gradient-to-r from-purple-500 to-pink-500 text-white font-medium shadow-lg hover:shadow-xl transition-all"
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
+              >
+                Go to Dashboard
+              </motion.button>
+              <UserButton 
+                afterSignOutUrl="/"
+                appearance={{
+                  elements: {
+                    avatarBox: "w-10 h-10",
+                  },
+                }}
+              />
+            </SignedIn>
+          </div>
+        </div>
+      </nav>
 
   return (
     <div className="min-h-screen relative overflow-hidden">
@@ -83,23 +129,28 @@ export default function Home() {
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.8, delay: 0.6 }}
           >
-            <motion.button
-              onClick={() => router.push("/dashboard")}
-              className="clay-button px-8 py-4 text-white font-body font-medium text-lg bg-gradient-to-r from-purple-500 to-pink-500 shadow-xl"
-              whileHover={{ scale: 1.05, y: -2 }}
-              whileTap={{ scale: 0.98 }}
-            >
-              🎨 Premium Dashboard
-            </motion.button>
+            <SignedIn>
+              <motion.button
+                onClick={() => router.push("/dashboard")}
+                className="clay-button px-8 py-4 text-white font-body font-medium text-lg bg-gradient-to-r from-purple-500 to-pink-500 shadow-xl"
+                whileHover={{ scale: 1.05, y: -2 }}
+                whileTap={{ scale: 0.98 }}
+              >
+                {isLoaded && user ? `Welcome back, ${user.firstName || 'there'}! 👋` : 'Go to Dashboard'}
+              </motion.button>
+            </SignedIn>
             
-            <motion.button
-              onClick={() => router.push("/onboarding")}
-              className="clay-button px-10 py-4 text-white font-body font-medium text-lg"
-              whileHover={{ scale: 1.02 }}
-              whileTap={{ scale: 0.98 }}
-            >
-              Start your comeback
-            </motion.button>
+            <SignedOut>
+              <SignInButton mode="modal">
+                <motion.button
+                  className="clay-button px-10 py-4 text-white font-body font-medium text-lg bg-gradient-to-r from-purple-500 to-pink-500 shadow-xl"
+                  whileHover={{ scale: 1.02 }}
+                  whileTap={{ scale: 0.98 }}
+                >
+                  Start your comeback
+                </motion.button>
+              </SignInButton>
+            </SignedOut>
           </motion.div>
 
           {/* Features preview cards */}

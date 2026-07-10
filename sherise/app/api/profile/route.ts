@@ -1,11 +1,9 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import { prisma } from '@/lib/prisma';
+import { requireAuth } from '@/lib/auth';
 
 const profileSchema = z.object({
-  userId: z.string().optional(), // If not provided, we'll create a new user
-  name: z.string().min(1),
-  email: z.string().email(),
   age: z.coerce.number().int().positive(),
   country: z.string().min(1),
   educationLevel: z.string().min(1),
@@ -17,82 +15,69 @@ const profileSchema = z.object({
   careerGoal: z.string().min(1),
 });
 
-export async function POST(request: NextRequest) {
+export async function POST(request: Request) {
   try {
+    // Get authenticated user from Clerk
+    const user = await requireAuth();
+
     const body = await request.json();
     const validatedData = profileSchema.parse(body);
 
-    // Create or update user with profile
-    const result = await prisma.user.upsert({
-      where: { email: validatedData.email },
-      update: {
-        name: validatedData.name,
-        profile: {
-          upsert: {
-            create: {
-              age: validatedData.age,
-              country: validatedData.country,
-              educationLevel: validatedData.educationLevel,
-              reasonStopped: validatedData.reasonStopped,
-              skills: validatedData.skills,
-              interests: validatedData.interests,
-              hoursPerDay: validatedData.hoursPerDay,
-              internetAvailability: validatedData.internetAvailability,
-              careerGoal: validatedData.careerGoal,
-            },
-            update: {
-              age: validatedData.age,
-              country: validatedData.country,
-              educationLevel: validatedData.educationLevel,
-              reasonStopped: validatedData.reasonStopped,
-              skills: validatedData.skills,
-              interests: validatedData.interests,
-              hoursPerDay: validatedData.hoursPerDay,
-              internetAvailability: validatedData.internetAvailability,
-              careerGoal: validatedData.careerGoal,
-            },
-          },
-        },
-      },
+    // Create or update profile for authenticated user
+    const profile = await prisma.profile.upsert({
+      where: { userId: user.id },
       create: {
-        name: validatedData.name,
-        email: validatedData.email,
-        profile: {
-          create: {
-            age: validatedData.age,
-            country: validatedData.country,
-            educationLevel: validatedData.educationLevel,
-            reasonStopped: validatedData.reasonStopped,
-            skills: validatedData.skills,
-            interests: validatedData.interests,
-            hoursPerDay: validatedData.hoursPerDay,
-            internetAvailability: validatedData.internetAvailability,
-            careerGoal: validatedData.careerGoal,
-          },
-        },
-        progressLogs: {
-          create: {
-            tasksCompleted: 0,
-            confidenceScore: 5,
-            streakCount: 0,
-            currentStepIndex: 0,
-          },
-        },
+        userId: user.id,
+        age: validatedData.age,
+        country: validatedData.country,
+        educationLevel: validatedData.educationLevel,
+        reasonStopped: validatedData.reasonStopped,
+        skills: validatedData.skills,
+        interests: validatedData.interests,
+        hoursPerDay: validatedData.hoursPerDay,
+        internetAvailability: validatedData.internetAvailability,
+        careerGoal: validatedData.careerGoal,
       },
-      include: {
-        profile: true,
+      update: {
+        age: validatedData.age,
+        country: validatedData.country,
+        educationLevel: validatedData.educationLevel,
+        reasonStopped: validatedData.reasonStopped,
+        skills: validatedData.skills,
+        interests: validatedData.interests,
+        hoursPerDay: validatedData.hoursPerDay,
+        internetAvailability: validatedData.internetAvailability,
+        careerGoal: validatedData.careerGoal,
       },
     });
 
+    // Initialize progress log if it doesn't exist
+    const existingProgress = await prisma.progressLog.findFirst({
+      where: { userId: user.id },
+    });
+
+    if (!existingProgress) {
+      await prisma.progressLog.create({
+        data: {
+          userId: user.id,
+          tasksCompleted: 0,
+          confidenceScore: 5,
+          streakCount: 0,
+          currentStepIndex: 0,
+          xpEarned: 0,
+        },
+      });
+    }
+
     return NextResponse.json({
       success: true,
-      userId: result.id,
       user: {
-        id: result.id,
-        name: result.name,
-        email: result.email,
+        id: user.id,
+        name: user.name,
+        email: user.email,
+        imageUrl: user.imageUrl,
       },
-      profile: result.profile,
+      profile,
     });
   } catch (error) {
     if (error instanceof z.ZodError) {
@@ -110,7 +95,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json(
       {
         success: false,
-        error: 'Failed to save profile',
+        error: error instanceof Error ? error.message : 'Failed to save profile',
       },
       { status: 500 }
     );
