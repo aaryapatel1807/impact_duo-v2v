@@ -118,6 +118,14 @@ export default function SkillPassport() {
     const content = generateMockContent(allSkillNames);
     setGeneratedContent(content);
     setShowContent(true);
+    
+    // Scroll to generated content after a short delay
+    setTimeout(() => {
+      const generatedSection = document.getElementById('generated-content');
+      if (generatedSection) {
+        generatedSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }
+    }, 100);
   };
 
   const copyToClipboard = (text: string) => {
@@ -256,6 +264,7 @@ export default function SkillPassport() {
         <AnimatePresence>
           {showContent && generatedContent && (
             <motion.div
+              id="generated-content"
               initial={{ opacity: 0, y: 40 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -40 }}
