@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { prisma } from '@/lib/prisma';
+import { requireAuth } from '@/lib/auth';
 
 const updateProgressSchema = z.object({
-  userId: z.string().cuid(),
   tasksCompleted: z.number().int().min(0).optional(),
   confidenceScore: z.number().int().min(1).max(10).optional(),
   currentStepIndex: z.number().int().min(0).max(4).optional(), // 5 steps (0-4)
@@ -143,20 +143,21 @@ function generateTodaysTasks(currentStepIndex: number, profile?: any): string[] 
 
 export async function POST(request: NextRequest) {
   try {
+    const user = await requireAuth();
     const body = await request.json();
-    const { userId, tasksCompleted, confidenceScore, currentStepIndex, completedAction } = 
+    const { tasksCompleted, confidenceScore, currentStepIndex, completedAction } = 
       updateProgressSchema.parse(body);
 
     // Get user profile for personalized tasks
     const profile = await prisma.profile.findUnique({
-      where: { userId }
+      where: { userId: user.id }
     });
 
     if (!profile) {
       return NextResponse.json(
         {
           success: false,
-          error: 'User profile not found',
+          error: 'Profile not found. Please complete onboarding.',
         },
         { status: 404 }
       );
@@ -164,7 +165,7 @@ export async function POST(request: NextRequest) {
 
     // Get previous progress logs for streak calculation
     const previousLogs = await prisma.progressLog.findMany({
-      where: { userId },
+      where: { userId: user.id },
       orderBy: { date: 'desc' },
       take: 30 // Last 30 days for streak calculation
     });
@@ -217,7 +218,7 @@ export async function POST(request: NextRequest) {
       // Create new log for today
       const newLog = await prisma.progressLog.create({
         data: {
-          userId,
+          userId: user.id,
           tasksCompleted: tasksCompleted || 0,
           confidenceScore: confidenceScore || 5,
           streakCount: newStreakCount,
@@ -242,22 +243,11 @@ export async function POST(request: NextRequest) {
     }
 
   } catch (error) {
-    if (error instanceof z.ZodError) {
-      return NextResponse.json(
-        {
-          success: false,
-          error: 'Invalid request data',
-          details: error.issues,
-        },
-        { status: 400 }
-      );
-    }
-
     console.error('Error updating progress:', error);
     return NextResponse.json(
       {
         success: false,
-        error: 'Failed to update progress',
+        error: error instanceof Error ? error.message : 'Failed to update progress',
       },
       { status: 500 }
     );

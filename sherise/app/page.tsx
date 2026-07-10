@@ -2,11 +2,11 @@
 
 import { motion } from "framer-motion";
 import { useRouter } from "next/navigation";
-import { SignedIn, SignedOut, SignInButton, UserButton, useUser } from "@clerk/nextjs";
+import { SignInButton, SignIn, UserButton, useUser } from "@clerk/nextjs";
 
 export default function Home() {
   const router = useRouter();
-  const { isLoaded, user } = useUser();
+  const { isLoaded, isSignedIn, user } = useUser();
 
   return (
     <div className="min-h-screen relative overflow-hidden">
@@ -18,7 +18,7 @@ export default function Home() {
           </div>
           
           <div className="flex items-center gap-4">
-            <SignedOut>
+            {isLoaded && !isSignedIn && (
               <SignInButton mode="modal">
                 <motion.button
                   className="px-6 py-2 rounded-xl bg-white/80 backdrop-blur-sm border border-purple-200 text-purple-700 font-medium hover:bg-white transition-all"
@@ -28,32 +28,31 @@ export default function Home() {
                   Sign In
                 </motion.button>
               </SignInButton>
-            </SignedOut>
+            )}
             
-            <SignedIn>
-              <motion.button
-                onClick={() => router.push("/dashboard")}
-                className="px-6 py-2 rounded-xl bg-gradient-to-r from-purple-500 to-pink-500 text-white font-medium shadow-lg hover:shadow-xl transition-all"
-                whileHover={{ scale: 1.05 }}
-                whileTap={{ scale: 0.95 }}
-              >
-                Go to Dashboard
-              </motion.button>
-              <UserButton 
-                afterSignOutUrl="/"
-                appearance={{
-                  elements: {
-                    avatarBox: "w-10 h-10",
-                  },
-                }}
-              />
-            </SignedIn>
+            {isLoaded && isSignedIn && (
+              <>
+                <motion.button
+                  onClick={() => router.push("/dashboard")}
+                  className="px-6 py-2 rounded-xl bg-gradient-to-r from-purple-500 to-pink-500 text-white font-medium shadow-lg hover:shadow-xl transition-all"
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.95 }}
+                >
+                  Go to Dashboard
+                </motion.button>
+                <UserButton 
+                  appearance={{
+                    elements: {
+                      avatarBox: "w-10 h-10",
+                    },
+                  }}
+                />
+              </>
+            )}
           </div>
         </div>
       </nav>
 
-  return (
-    <div className="min-h-screen relative overflow-hidden">
       {/* Floating background blobs with parallax */}
       <motion.div
         className="absolute top-20 left-10 w-96 h-96 bg-primary-light/10 rounded-full blur-3xl"
@@ -129,18 +128,18 @@ export default function Home() {
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.8, delay: 0.6 }}
           >
-            <SignedIn>
+            {isLoaded && isSignedIn && (
               <motion.button
                 onClick={() => router.push("/dashboard")}
                 className="clay-button px-8 py-4 text-white font-body font-medium text-lg bg-gradient-to-r from-purple-500 to-pink-500 shadow-xl"
                 whileHover={{ scale: 1.05, y: -2 }}
                 whileTap={{ scale: 0.98 }}
               >
-                {isLoaded && user ? `Welcome back, ${user.firstName || 'there'}! 👋` : 'Go to Dashboard'}
+                {user ? `Welcome back, ${user.firstName || 'there'}! 👋` : 'Go to Dashboard'}
               </motion.button>
-            </SignedIn>
+            )}
             
-            <SignedOut>
+            {isLoaded && !isSignedIn && (
               <SignInButton mode="modal">
                 <motion.button
                   className="clay-button px-10 py-4 text-white font-body font-medium text-lg bg-gradient-to-r from-purple-500 to-pink-500 shadow-xl"
@@ -150,7 +149,7 @@ export default function Home() {
                   Start your comeback
                 </motion.button>
               </SignInButton>
-            </SignedOut>
+            )}
           </motion.div>
 
           {/* Features preview cards */}

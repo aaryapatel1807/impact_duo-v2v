@@ -15,6 +15,38 @@ const profileSchema = z.object({
   careerGoal: z.string().min(1),
 });
 
+// GET: Fetch authenticated user's profile
+export async function GET() {
+  try {
+    const user = await requireAuth();
+
+    const profile = await prisma.profile.findUnique({
+      where: { userId: user.id },
+    });
+
+    return NextResponse.json({
+      success: true,
+      user: {
+        id: user.id,
+        name: user.name,
+        email: user.email,
+        imageUrl: user.imageUrl,
+        username: user.username,
+        profile,
+      },
+    });
+  } catch (error) {
+    return NextResponse.json(
+      {
+        success: false,
+        error: error instanceof Error ? error.message : 'Failed to fetch profile',
+      },
+      { status: 500 }
+    );
+  }
+}
+
+// POST: Create or update authenticated user's profile
 export async function POST(request: Request) {
   try {
     // Get authenticated user from Clerk

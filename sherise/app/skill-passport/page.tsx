@@ -1,196 +1,130 @@
 "use client";
 
-import { useState } from "react";
-import { motion, AnimatePresence } from "framer-motion";
+import { useEffect, useState } from "react";
+import { motion } from "framer-motion";
 import { useRouter } from "next/navigation";
-import {
-  ensureUserProfile,
-  getStoredUserId,
-  isOnboardingComplete,
-  type OnboardingStorage,
-} from "@/lib/profile-client";
+import { useUser } from "@clerk/nextjs";
 
-interface LifeRole {
-  id: string;
-  label: string;
-  skills: {
-    name: string;
-    justification: string;
-  }[];
+interface SkillEntry {
+  lifeRole: string;
+  mappedSkill: string;
+  justification: string;
 }
-
-const lifeRoles: LifeRole[] = [
-  {
-    id: "homemaker",
-    label: "Homemaker",
-    skills: [
-      {
-        name: "Budget & Cash Flow Management",
-        justification: "Managing household expenses requires tracking income, prioritizing needs, and planning for irregular costs — the same skills financial analysts use.",
-      },
-    ],
-  },
-  {
-    id: "caregiver",
-    label: "Caregiver",
-    skills: [
-      {
-        name: "Crisis Management & Problem-Solving",
-        justification: "Responding to urgent needs, staying calm under pressure, and making quick decisions are core leadership competencies.",
-      },
-    ],
-  },
-  {
-    id: "cook",
-    label: "Cook",
-    skills: [
-      {
-        name: "Operations & Resource Planning",
-        justification: "Coordinating multiple dishes, timing, and ingredient prep is operations management — used in restaurants, catering, and supply chains.",
-      },
-    ],
-  },
-  {
-    id: "tutor",
-    label: "Tutor / Teacher",
-    skills: [
-      {
-        name: "Communication & Instructional Design",
-        justification: "Breaking complex ideas into simple steps and adapting to different learning styles is what professional educators and trainers do.",
-      },
-    ],
-  },
-  {
-    id: "tailor",
-    label: "Tailor / Craftsperson",
-    skills: [
-      {
-        name: "Entrepreneurship & Production Management",
-        justification: "Taking orders, managing materials, meeting deadlines, and pricing work are small business operations — the foundation of entrepreneurship.",
-      },
-    ],
-  },
-  {
-    id: "organizer",
-    label: "Community Organizer",
-    skills: [
-      {
-        name: "Stakeholder Coordination & Networking",
-        justification: "Bringing people together, building consensus, and managing group activities are key project management and leadership skills.",
-      },
-    ],
-  },
-];
 
 interface GeneratedContent {
-  resume: string;
+  resumeSummary: string;
   bio: string;
-  pitch: string;
-}
-
-// Mock function - will be replaced with actual AI call
-function generateMockContent(selectedSkills: string[]): GeneratedContent {
-  return {
-    resume: `Resourceful professional with hands-on experience in ${selectedSkills.slice(0, 2).join(" and ").toLowerCase()}. Proven track record of managing complex responsibilities while maintaining quality and efficiency. Strong problem-solving abilities developed through real-world application. Seeking opportunities to apply practical skills in a professional setting and contribute to organizational growth.`,
-    bio: `I'm a dedicated professional who has built valuable expertise through managing a household, tutoring students, and running a small tailoring business. My experience has taught me ${selectedSkills[0]?.toLowerCase()}, effective communication, and adaptability. I'm now looking to transition these real-world skills into formal career opportunities where I can grow and make an impact.`,
-    pitch: `"I've spent years managing budgets, teaching children, and running a small business — all while adapting to changing needs and solving problems on the fly. I bring practical experience in ${selectedSkills[0]?.toLowerCase()} and a proven ability to learn quickly and deliver results. I'm ready to bring that same dedication and skill to your team."`,
-  };
+  elevatorPitch: string;
+  atsScore: number;
 }
 
 export default function SkillPassport() {
   const router = useRouter();
-  const [selectedRoles, setSelectedRoles] = useState<string[]>([]);
-  const [revealedSkills, setRevealedSkills] = useState<string[]>([]);
+  const { user, isLoaded } = useUser();
+  const [skillEntries, setSkillEntries] = useState<SkillEntry[]>([]);
   const [generatedContent, setGeneratedContent] = useState<GeneratedContent | null>(null);
-  const [showContent, setShowContent] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [generating, setGenerating] = useState(false);
 
-  const handleRoleToggle = (roleId: string) => {
-    if (selectedRoles.includes(roleId)) {
-      setSelectedRoles(selectedRoles.filter((id) => id !== roleId));
-      setRevealedSkills(revealedSkills.filter((id) => id !== roleId));
-    } else {
-      setSelectedRoles([...selectedRoles, roleId]);
-      // Trigger reveal animation after a short delay
-      setTimeout(() => {
-        setRevealedSkills([...revealedSkills, roleId]);
-      }, 100);
+  useEffect(() => {
+    if (!isLoaded) return;
+    
+    if (!user) {
+      router.push("/sign-in");
+      return;
+    }
+
+    fetchSkillPassport();
+  }, [isLoaded, user, router]);
+
+  const fetchSkillPassport = async () => {
+    try {
+      setLoading(true);
+      const response = await fetch(`/api/skill-passport/${user!.id}`);
+      
+      if (response.ok) {
+        const data = await response.json();
+        if (data.entries) {
+          setSkillEntries(data.entries);
+        }
+        if (data.content) {
+          setGeneratedContent(data.content);
+        }
+      }
+    } catch (error) {
+      console.error("Error fetching skill passport:", error);
+    } finally {
+      setLoading(false);
     }
   };
 
-  const handleGenerate = async () => {
+  const generatePassport = async () => {
     try {
-      let userId = getStoredUserId();
-      if (!userId) {
-        const userData = localStorage.getItem("userData");
-        if (!userData) {
-          router.push("/onboarding");
-          return;
-        }
-
-        const parsed = JSON.parse(userData) as OnboardingStorage;
-        if (!isOnboardingComplete(parsed)) {
-          router.push("/onboarding");
-          return;
-        }
-
-        userId = await ensureUserProfile(parsed);
-      }
-
-      // Generate skill passport using real API
+      setGenerating(true);
       const response = await fetch("/api/skill-passport/generate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          userId,
-          selectedRoles: selectedRoles,
-        }),
       });
 
-      if (!response.ok) {
-        throw new Error("Failed to generate skill passport");
-      }
-
-      const data = await response.json();
-      
-      if (data.success && data.generatedContent) {
+      if (response.ok) {
+        const data = await response.json();
+        setSkillEntries(data.mappings || []);
         setGeneratedContent({
-          resume: data.generatedContent.resumeSummary,
-          bio: data.generatedContent.bio,
-          pitch: data.generatedContent.elevatorPitch,
+          resumeSummary: data.resumeSummary,
+          bio: data.bio,
+          elevatorPitch: data.elevatorPitch,
+          atsScore: data.atsScore || 85,
         });
-        setShowContent(true);
-        
-        // Scroll to generated content after a short delay
-        setTimeout(() => {
-          const generatedSection = document.getElementById('generated-content');
-          if (generatedSection) {
-            generatedSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
-          }
-        }, 100);
       } else {
-        // Fallback to mock content
-        const allSkillNames = selectedRoles.flatMap(
-          (roleId) => lifeRoles.find((r) => r.id === roleId)?.skills.map((s) => s.name) || []
-        );
-        const mockContent = generateMockContent(allSkillNames);
-        setGeneratedContent(mockContent);
-        setShowContent(true);
+        alert("Failed to generate skill passport. Please try again.");
       }
     } catch (error) {
       console.error("Error generating skill passport:", error);
-      // Fallback to mock content
-      const allSkillNames = selectedRoles.flatMap(
-        (roleId) => lifeRoles.find((r) => r.id === roleId)?.skills.map((s) => s.name) || []
-      );
-      const mockContent = generateMockContent(allSkillNames);
-      setGeneratedContent(mockContent);
-      setShowContent(true);
+      alert("An error occurred. Please try again.");
+    } finally {
+      setGenerating(false);
     }
   };
 
-  const copyToClipboard = (text: string) => {
-    navigator.clipboard.writeText(text);
-  };
+  if (!isLoaded || loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center">
+          <div className="w-16 h-16 border-4 border-purple-500 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+          <p className="text-gray-600">Loading your skill passport...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (skillEntries.length === 0 && !generatedContent) {
+    return (
+      <div className="min-h-screen py-12 px-6">
+        <div className="max-w-4xl mx-auto text-center">
+          <motion.div
+            className="clay-card p-12"
+            initial={{ opacity: 0, y: 30 }}
+            animate={{ opacity: 1, y: 0 }}
+          >
+            <div className="text-6xl mb-6">📋</div>
+            <h1 className="text-3xl font-bold text-gray-800 mb-4">
+              Create Your Skill Passport
+            </h1>
+            <p className="text-gray-600 mb-8 max-w-2xl mx-auto">
+              Transform your life experiences into professional skills that employers value.
+            </p>
+            <button
+              onClick={generatePassport}
+              disabled={generating}
+              className="clay-button px-8 py-4 text-white font-medium disabled:opacity-50"
+            >
+              {generating ? "Generating..." : "Generate Skill Passport"}
+            </button>
+          </motion.div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen py-12 px-6">
@@ -200,208 +134,110 @@ export default function SkillPassport() {
           className="text-center mb-12"
           initial={{ opacity: 0, y: -20 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.6 }}
         >
-          <h1 className="font-display text-3xl md:text-2xl font-medium text-text mb-4">
-            Your Skill Passport
-          </h1>
-          <p className="font-body text-base text-text-muted max-w-2xl mx-auto">
-            Your lived experience is professional expertise. Let's prove it.
-          </p>
+          <h1 className="text-4xl font-bold text-gray-800 mb-4">Your Skill Passport</h1>
+          <p className="text-gray-600">Professional assets derived from your life experience</p>
         </motion.div>
 
-        {/* Instruction card */}
-        <motion.div
-          className="clay-card p-6 mb-8 bg-accent-plum/5 border-l-4 border-accent-plum"
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.6, delay: 0.2 }}
-        >
-          <p className="font-body text-base text-text">
-            Select the roles that describe your experience. Watch them transform into professional skills.
-          </p>
-        </motion.div>
+        {/* ATS Score */}
+        {generatedContent && (
+          <motion.div
+            className="clay-card p-8 mb-8 text-center"
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+          >
+            <div className="inline-block">
+              <div className="text-6xl font-bold text-purple-600 mb-2">
+                {generatedContent.atsScore}%
+              </div>
+              <p className="text-gray-600 font-medium">ATS Compatibility Score</p>
+            </div>
+          </motion.div>
+        )}
 
-        {/* Life roles grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-12">
-          {lifeRoles.map((role, index) => (
+        {/* Generated Content */}
+        {generatedContent && (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
             <motion.div
-              key={role.id}
-              initial={{ opacity: 0, y: 30 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.5, delay: 0.3 + index * 0.08 }}
+              className="clay-card p-6"
+              initial={{ opacity: 0, x: -20 }}
+              animate={{ opacity: 1, x: 0 }}
             >
-              <button
-                onClick={() => handleRoleToggle(role.id)}
-                className={`w-full clay-card p-6 text-left transition-all duration-300 ${
-                  selectedRoles.includes(role.id)
-                    ? "ring-2 ring-primary bg-primary/5"
-                    : "hover:ring-2 hover:ring-primary-light"
-                }`}
-              >
-                <div className="flex items-center justify-between mb-4">
-                  <h3 className="font-body text-lg font-semibold text-text">
-                    {role.label}
-                  </h3>
-                  <div
-                    className={`w-6 h-6 rounded-full border-2 flex items-center justify-center transition-all ${
-                      selectedRoles.includes(role.id)
-                        ? "border-primary bg-primary"
-                        : "border-border"
-                    }`}
-                  >
-                    {selectedRoles.includes(role.id) && (
-                      <motion.svg
-                        className="w-4 h-4 text-white"
-                        initial={{ scale: 0 }}
-                        animate={{ scale: 1 }}
-                        transition={{ type: "spring", stiffness: 500 }}
-                        fill="none"
-                        viewBox="0 0 24 24"
-                        stroke="currentColor"
-                      >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          strokeWidth={3}
-                          d="M5 13l4 4L19 7"
-                        />
-                      </motion.svg>
-                    )}
-                  </div>
-                </div>
+              <h3 className="text-xl font-semibold text-gray-800 mb-4">Resume Summary</h3>
+              <p className="text-gray-700 leading-relaxed">{generatedContent.resumeSummary}</p>
+            </motion.div>
 
-                <AnimatePresence>
-                  {revealedSkills.includes(role.id) && (
-                    <motion.div
-                      initial={{ opacity: 0, rotateY: -90, height: 0 }}
-                      animate={{ opacity: 1, rotateY: 0, height: "auto" }}
-                      exit={{ opacity: 0, rotateY: 90, height: 0 }}
-                      transition={{ duration: 0.6, ease: "easeOut" }}
-                      className="origin-left"
-                    >
-                      <div className="pt-4 border-t border-border">
-                        <div className="mb-2">
-                          <span className="inline-block px-3 py-1 bg-primary text-white text-sm font-medium rounded-full">
-                            Professional Skill
-                          </span>
-                        </div>
-                        <h4 className="font-body font-semibold text-primary mb-2">
-                          {role.skills[0].name}
-                        </h4>
-                        <p className="font-body text-sm text-text-muted leading-relaxed">
-                          {role.skills[0].justification}
-                        </p>
-                      </div>
-                    </motion.div>
-                  )}
-                </AnimatePresence>
-              </button>
+            <motion.div
+              className="clay-card p-6"
+              initial={{ opacity: 0, x: 20 }}
+              animate={{ opacity: 1, x: 0 }}
+            >
+              <h3 className="text-xl font-semibold text-gray-800 mb-4">LinkedIn Bio</h3>
+              <p className="text-gray-700 leading-relaxed">{generatedContent.bio}</p>
+            </motion.div>
+
+            <motion.div
+              className="clay-card p-6 md:col-span-2"
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.2 }}
+            >
+              <h3 className="text-xl font-semibold text-gray-800 mb-4">Elevator Pitch</h3>
+              <p className="text-gray-700 leading-relaxed">{generatedContent.elevatorPitch}</p>
+            </motion.div>
+          </div>
+        )}
+
+        {/* Skill Mappings */}
+        <div className="space-y-4">
+          <h2 className="text-2xl font-semibold text-gray-800 mb-4">Life Skills → Professional Skills</h2>
+          {skillEntries.map((entry, index) => (
+            <motion.div
+              key={index}
+              className="clay-card p-6"
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: index * 0.1 }}
+            >
+              <div className="flex items-start space-x-4">
+                <div className="flex-1">
+                  <div className="flex items-center space-x-4 mb-2">
+                    <span className="text-sm font-medium text-gray-500 bg-gray-100 px-3 py-1 rounded-full">
+                      {entry.lifeRole}
+                    </span>
+                    <span className="text-gray-400">→</span>
+                    <span className="text-sm font-semibold text-purple-700 bg-purple-100 px-3 py-1 rounded-full">
+                      {entry.mappedSkill}
+                    </span>
+                  </div>
+                  <p className="text-gray-600 text-sm">{entry.justification}</p>
+                </div>
+              </div>
             </motion.div>
           ))}
         </div>
 
-        {/* Generate button */}
-        {selectedRoles.length > 0 && (
-          <motion.div
-            className="text-center mb-12"
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
+        {/* Actions */}
+        <motion.div
+          className="mt-12 flex justify-center space-x-4"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ delay: 0.5 }}
+        >
+          <button
+            onClick={() => router.push("/dashboard")}
+            className="px-6 py-3 bg-gray-100 text-gray-700 font-medium rounded-xl hover:bg-gray-200 transition-all"
           >
-            <button
-              onClick={handleGenerate}
-              className="clay-button px-10 py-4 text-white font-body font-medium text-lg"
-            >
-              Generate My Professional Profile
-            </button>
-            <p className="mt-3 text-sm text-text-muted">
-              {selectedRoles.length} {selectedRoles.length === 1 ? "skill" : "skills"} selected
-            </p>
-          </motion.div>
-        )}
-
-        {/* Generated content */}
-        <AnimatePresence>
-          {showContent && generatedContent && (
-            <motion.div
-              id="generated-content"
-              initial={{ opacity: 0, y: 40 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -40 }}
-              transition={{ duration: 0.6 }}
-              className="space-y-6"
-            >
-              {/* Resume Summary */}
-              <div className="clay-card p-8">
-                <div className="flex items-start justify-between mb-4">
-                  <h3 className="font-body text-xl font-semibold text-accent-plum">
-                    Resume Summary
-                  </h3>
-                  <button
-                    onClick={() => copyToClipboard(generatedContent.resume)}
-                    className="px-4 py-2 text-sm font-body font-medium text-primary hover:bg-primary/10 rounded-lg transition-colors"
-                  >
-                    Copy
-                  </button>
-                </div>
-                <p className="font-body text-base text-text leading-relaxed">
-                  {generatedContent.resume}
-                </p>
-              </div>
-
-              {/* LinkedIn Bio */}
-              <div className="clay-card p-8">
-                <div className="flex items-start justify-between mb-4">
-                  <h3 className="font-body text-xl font-semibold text-accent-plum">
-                    LinkedIn-Style Bio
-                  </h3>
-                  <button
-                    onClick={() => copyToClipboard(generatedContent.bio)}
-                    className="px-4 py-2 text-sm font-body font-medium text-primary hover:bg-primary/10 rounded-lg transition-colors"
-                  >
-                    Copy
-                  </button>
-                </div>
-                <p className="font-body text-base text-text leading-relaxed">
-                  {generatedContent.bio}
-                </p>
-              </div>
-
-              {/* Elevator Pitch */}
-              <div className="clay-card p-8">
-                <div className="flex items-start justify-between mb-4">
-                  <h3 className="font-body text-xl font-semibold text-accent-plum">
-                    30-Second Elevator Pitch
-                  </h3>
-                  <button
-                    onClick={() => copyToClipboard(generatedContent.pitch)}
-                    className="px-4 py-2 text-sm font-body font-medium text-primary hover:bg-primary/10 rounded-lg transition-colors"
-                  >
-                    Copy
-                  </button>
-                </div>
-                <p className="font-body text-base text-text leading-relaxed italic">
-                  {generatedContent.pitch}
-                </p>
-              </div>
-
-              {/* Navigation */}
-              <motion.div
-                className="flex justify-center pt-8"
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                transition={{ delay: 0.4 }}
-              >
-                <button
-                  onClick={() => router.push("/opportunity-radar")}
-                  className="clay-button px-8 py-4 text-white font-body font-medium"
-                >
-                  Next: Find Opportunities →
-                </button>
-              </motion.div>
-            </motion.div>
-          )}
-        </AnimatePresence>
+            Back to Dashboard
+          </button>
+          <button
+            onClick={generatePassport}
+            disabled={generating}
+            className="clay-button px-6 py-3 text-white font-medium disabled:opacity-50"
+          >
+            {generating ? "Regenerating..." : "Regenerate Passport"}
+          </button>
+        </motion.div>
       </div>
     </div>
   );

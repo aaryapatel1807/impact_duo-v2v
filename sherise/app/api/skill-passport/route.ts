@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { prisma } from '@/lib/prisma';
+import { requireAuth } from '@/lib/auth';
 
 const skillEntrySchema = z.object({
   lifeRole: z.string(),
@@ -9,7 +10,6 @@ const skillEntrySchema = z.object({
 });
 
 const skillPassportSchema = z.object({
-  userId: z.string(),
   skills: z.array(skillEntrySchema),
   generatedContent: z.object({
     resumeSummary: z.string(),
@@ -20,18 +20,19 @@ const skillPassportSchema = z.object({
 
 export async function POST(request: NextRequest) {
   try {
+    const user = await requireAuth();
     const body = await request.json();
     const validatedData = skillPassportSchema.parse(body);
 
     // Delete existing entries for this user to replace with new ones
     await prisma.skillPassportEntry.deleteMany({
-      where: { userId: validatedData.userId },
+      where: { userId: user.id },
     });
 
     // Create new skill passport entries
     const skillEntries = await prisma.skillPassportEntry.createMany({
       data: validatedData.skills.map((skill) => ({
-        userId: validatedData.userId,
+        userId: user.id,
         lifeRole: skill.lifeRole,
         mappedSkill: skill.mappedSkill,
         justification: skill.justification,
@@ -40,9 +41,9 @@ export async function POST(request: NextRequest) {
 
     // Upsert generated content
     const generatedContent = await prisma.generatedContent.upsert({
-      where: { userId: validatedData.userId },
+      where: { userId: user.id },
       create: {
-        userId: validatedData.userId,
+        userId: user.id,
         resumeSummary: validatedData.generatedContent.resumeSummary,
         bio: validatedData.generatedContent.bio,
         elevatorPitch: validatedData.generatedContent.elevatorPitch,
@@ -75,7 +76,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json(
       {
         success: false,
-        error: 'Failed to save skill passport',
+        error: error instanceof Error ? error.message : 'Failed to save skill passport',
       },
       { status: 500 }
     );

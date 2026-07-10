@@ -1,11 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { z } from 'zod';
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import { prisma } from '@/lib/prisma';
-
-const generateRoadmapSchema = z.object({
-  userId: z.string(),
-});
+import { requireAuth } from '@/lib/auth';
 
 // Initialize Gemini client
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || '');
@@ -85,23 +81,19 @@ function getFallbackRoadmap(profile: any) {
 
 export async function POST(request: NextRequest) {
   try {
-    const body = await request.json();
-    const { userId } = generateRoadmapSchema.parse(body);
+    const user = await requireAuth();
 
     // Fetch user profile
-    const user = await prisma.user.findUnique({
-      where: { id: userId },
-      include: { profile: true },
+    const profile = await prisma.profile.findUnique({
+      where: { userId: user.id },
     });
 
-    if (!user || !user.profile) {
+    if (!profile) {
       return NextResponse.json(
-        { success: false, error: 'User or profile not found' },
+        { success: false, error: 'Profile not found. Please complete onboarding.' },
         { status: 404 }
       );
     }
-
-    const profile = user.profile;
 
     // Build the AI prompt
     const systemPrompt = `You are a career counselor specializing in helping women return to education and work after life interruptions. You create personalized, realistic comeback roadmaps.
@@ -158,7 +150,7 @@ Make every step concrete and tied to real programs or platforms.`;
       // Save to database
       const roadmap = await prisma.roadmap.create({
         data: {
-          userId,
+          userId: user.id,
           currentSituation: aiResponse.currentSituation,
           steps: aiResponse.steps,
           timelineMonths: aiResponse.timelineMonths,
@@ -179,7 +171,7 @@ Make every step concrete and tied to real programs or platforms.`;
       
       const roadmap = await prisma.roadmap.create({
         data: {
-          userId,
+          userId: user.id,
           currentSituation: fallbackData.currentSituation,
           steps: fallbackData.steps,
           timelineMonths: fallbackData.timelineMonths,
@@ -194,16 +186,9 @@ Make every step concrete and tied to real programs or platforms.`;
     }
 
   } catch (error) {
-    if (error instanceof z.ZodError) {
-      return NextResponse.json(
-        { success: false, error: 'Validation error', details: error.issues },
-        { status: 400 }
-      );
-    }
-
     console.error('Error generating roadmap:', error);
     return NextResponse.json(
-      { success: false, error: 'Failed to generate roadmap' },
+      { success: false, error: error instanceof Error ? error.message : 'Failed to generate roadmap' },
       { status: 500 }
     );
   }

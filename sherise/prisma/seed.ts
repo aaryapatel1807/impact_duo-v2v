@@ -20,8 +20,11 @@ async function main() {
     where: { email: 'priya.demo@sherise.app' },
     update: {},
     create: {
+      id: 'user_demo_priya_001', // Demo Clerk user ID
       name: 'Priya',
       email: 'priya.demo@sherise.app',
+      imageUrl: null,
+      username: 'priya_demo',
       profile: {
         create: {
           age: 27,

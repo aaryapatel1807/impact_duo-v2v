@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
+import { requireAuth } from '@/lib/auth';
 
 function getUpcomingDeadlines(opportunities: any[]): Array<{title: string, organization: string, deadline: string, daysLeft: number}> {
   const now = new Date();
@@ -90,30 +91,27 @@ function getProgressAnalytics(progressLogs: any[]) {
   };
 }
 
-export async function GET(
-  request: NextRequest,
-  { params }: { params: Promise<{ userId: string }> }
-) {
+export async function GET(request: NextRequest) {
   try {
-    const { userId } = await params;
+    const user = await requireAuth();
 
     // Get comprehensive user data
     const [progressLogs, profile, roadmap, opportunityMatches] = await Promise.all([
       prisma.progressLog.findMany({
-        where: { userId },
+        where: { userId: user.id },
         orderBy: { date: 'desc' },
         take: 30 // Last 30 days
       }),
       prisma.profile.findUnique({
-        where: { userId }
+        where: { userId: user.id }
       }),
       prisma.roadmap.findFirst({
-        where: { userId },
+        where: { userId: user.id },
         orderBy: { createdAt: 'desc' }
       }),
       prisma.opportunityMatch.findMany({
         where: { 
-          userId,
+          userId: user.id,
           status: { in: ['eligible', 'almost'] }
         },
         include: {
@@ -239,7 +237,7 @@ export async function GET(
     return NextResponse.json(
       {
         success: false,
-        error: 'Failed to fetch progress',
+        error: error instanceof Error ? error.message : 'Failed to fetch progress',
       },
       { status: 500 }
     );

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { prisma } from '@/lib/prisma';
+import { requireAuth } from '@/lib/auth';
 
 const roadmapStepSchema = z.object({
   title: z.string(),
@@ -10,7 +11,6 @@ const roadmapStepSchema = z.object({
 });
 
 const roadmapSchema = z.object({
-  userId: z.string(),
   currentSituation: z.string(),
   steps: z.array(roadmapStepSchema),
   timelineMonths: z.string(),
@@ -18,12 +18,13 @@ const roadmapSchema = z.object({
 
 export async function POST(request: NextRequest) {
   try {
+    const user = await requireAuth();
     const body = await request.json();
     const validatedData = roadmapSchema.parse(body);
 
     const roadmap = await prisma.roadmap.create({
       data: {
-        userId: validatedData.userId,
+        userId: user.id,
         currentSituation: validatedData.currentSituation,
         steps: validatedData.steps,
         timelineMonths: validatedData.timelineMonths,
@@ -50,7 +51,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json(
       {
         success: false,
-        error: 'Failed to save roadmap',
+        error: error instanceof Error ? error.message : 'Failed to save roadmap',
       },
       { status: 500 }
     );

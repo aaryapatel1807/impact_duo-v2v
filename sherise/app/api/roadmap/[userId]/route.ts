@@ -1,16 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
+import { requireAuth } from '@/lib/auth';
 
-export async function GET(
-  request: NextRequest,
-  { params }: { params: Promise<{ userId: string }> }
-) {
+export async function GET(request: NextRequest) {
   try {
-    const { userId } = await params;
+    const user = await requireAuth();
 
     // Get the most recent roadmap for this user
     const roadmap = await prisma.roadmap.findFirst({
-      where: { userId },
+      where: { userId: user.id },
       orderBy: { createdAt: 'desc' },
     });
 
@@ -30,7 +28,7 @@ export async function GET(
     return NextResponse.json(
       {
         success: false,
-        error: 'Failed to fetch roadmap',
+        error: error instanceof Error ? error.message : 'Failed to fetch roadmap',
       },
       { status: 500 }
     );

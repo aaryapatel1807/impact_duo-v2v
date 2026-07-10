@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import { useRouter } from "next/navigation";
+import { useUser } from "@clerk/nextjs";
 import Sidebar from "@/components/dashboard/Sidebar";
 import TopNavbar from "@/components/dashboard/TopNavbar";
 import HeroSection from "@/components/dashboard/HeroSection";
@@ -16,12 +17,15 @@ import { PhoenixOrb } from "@/components/dashboard/PhoenixOrb";
 
 interface DashboardData {
   user: {
+    id: string;
     name: string;
-    avatar: string;
+    email: string;
+    imageUrl: string | null;
     level: number;
     xp: number;
     maxXp: number;
   };
+  hasProfile: boolean;
   stats: {
     careerProgress: number;
     learningStreak: number;
@@ -38,12 +42,12 @@ interface DashboardData {
       status: "completed" | "current" | "future";
       description: string;
     }>;
-  };
+  } | null;
   skillPassport: {
     atsScore: number;
     skills: string[];
     summary: string;
-  };
+  } | null;
   opportunities: Array<{
     id: string;
     title: string;
@@ -70,213 +74,155 @@ interface DashboardData {
 
 export default function Dashboard() {
   const router = useRouter();
+  const { user: clerkUser, isLoaded } = useUser();
   const [dashboardData, setDashboardData] = useState<DashboardData | null>(null);
   const [loading, setLoading] = useState(true);
-  const [phoenixProgress, setPhoenixProgress] = useState(0);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!isLoaded) return;
+    
+    if (!clerkUser) {
+      router.push("/sign-in");
+      return;
+    }
+
+    loadDashboardData();
+  }, [isLoaded, clerkUser, router]);
 
   const loadDashboardData = async () => {
     try {
-      // Simple check for onboarding completion
-      let userId: string = localStorage.getItem("userId") || "";
-      const onboardingComplete = localStorage.getItem("onboardingComplete");
-      const userData = localStorage.getItem("userData");
-      
-      // If no completion flag and no userData, redirect to onboarding
-      if (!onboardingComplete && !userData) {
+      setLoading(true);
+      setError(null);
+
+      // Fetch user profile
+      const profileRes = await fetch("/api/profile");
+      const profileData = await profileRes.json();
+
+      if (!profileData.success) {
+        throw new Error(profileData.error || "Failed to load profile");
+      }
+
+      const hasProfile = !!profileData.user?.profile;
+
+      // If no profile, redirect to onboarding
+      if (!hasProfile) {
         router.push("/onboarding");
         return;
       }
+
+      // Fetch progress data
+      const progressRes = await fetch(`/api/progress/${clerkUser!.id}`);
+      const progressData = progressRes.ok ? await progressRes.json() : null;
+
+      // Fetch roadmap
+      const roadmapRes = await fetch(`/api/roadmap/${clerkUser!.id}`);
+      const roadmapData = roadmapRes.ok ? await roadmapRes.json() : null;
+
+      // Fetch skill passport
+      const skillPassportRes = await fetch(`/api/skill-passport/${clerkUser!.id}`);
+      const skillPassportData = skillPassportRes.ok ? await skillPassportRes.json() : null;
+
+      // Fetch matched opportunities
+      const opportunitiesRes = await fetch("/api/opportunities/match", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ userId: clerkUser!.id }),
+      });
+      const opportunitiesData = opportunitiesRes.ok ? await opportunitiesRes.json() : null;
+
+      // Calculate real statistics
+      const roadmapProgress = roadmapData?.roadmap?.completionPercent || 0;
+      const currentStreak = progressData?.dashboard?.currentStreak || 0;
+      const totalXP = progressData?.dashboard?.analytics?.totalXP || 0;
+      const eligibleOpportunities = opportunitiesData?.matches?.eligible || [];
       
-      // If we have userData but no userId, create one
-      if (!userId) {
-        if (userData) {
-          try {
-            const parsed = JSON.parse(userData);
-            const profileResponse = await fetch("/api/profile", {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({
-                name: parsed.name || "User",
-                email: parsed.email || `user-${Date.now()}@sherise.app`,
-                age: parseInt(parsed.age || "27"),
-                country: parsed.country || "India",
-                educationLevel: parsed.education || "Higher Secondary",
-                reasonStopped: parsed.reasonStopped || "Personal reasons",
-                skills: parsed.skills || "Various skills",
-                interests: parsed.interests || "Technology",
-                hoursPerDay: parsed.hoursPerDay || "2-4 hours",
-                internetAvailability: parsed.internetAvailability || "low",
-                careerGoal: parsed.careerGoal || "Career growth",
-              }),
-            });
-            
-            if (profileResponse.ok) {
-              const profileData = await profileResponse.json();
-              userId = profileData.user?.id || `demo-${Date.now()}`;
-              localStorage.setItem("userId", userId);
-            } else {
-              // Fallback: use demo userId
-              userId = `demo-${Date.now()}`;
-              localStorage.setItem("userId", userId);
-            }
-          } catch (error) {
-            console.error("Profile creation failed:", error);
-            userId = `demo-${Date.now()}`;
-            localStorage.setItem("userId", userId);
-          }
-        } else {
-          // Just use demo userId
-          userId = `demo-${Date.now()}`;
-          localStorage.setItem("userId", userId);
-        }
-      }
-
-      // Fetch comprehensive dashboard data
-      const [progressResponse, opportunitiesResponse] = await Promise.all([
-        fetch(`/api/progress/${userId}`),
-        fetch("/api/opportunities/match", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ userId }),
-        }),
-      ]);
-
-      const progressData = progressResponse.ok ? await progressResponse.json() : null;
-      const opportunitiesData = opportunitiesResponse.ok ? await opportunitiesResponse.json() : null;
-
-      // Calculate Phoenix progress based on roadmap completion
-      const roadmapProgress = progressData?.dashboard?.roadmapProgress?.progressPercentage || 0;
-      setPhoenixProgress(roadmapProgress);
-
-      // Mock comprehensive dashboard data
-      const mockData: DashboardData = {
+      // Build dashboard data from REAL database values
+      const data: DashboardData = {
         user: {
-          name: "Priya",
-          avatar: "👩‍💼",
-          level: Math.floor(roadmapProgress / 20) + 1,
-          xp: (roadmapProgress * 10) + (progressData?.dashboard?.analytics?.totalTasks || 0) * 50,
+          id: clerkUser!.id,
+          name: clerkUser!.fullName || clerkUser!.emailAddresses[0]?.emailAddress.split('@')[0] || "User",
+          email: clerkUser!.emailAddresses[0]?.emailAddress || "",
+          imageUrl: clerkUser!.imageUrl,
+          level: Math.floor(totalXP / 1000) + 1,
+          xp: totalXP % 1000,
           maxXp: 1000,
         },
+        hasProfile,
         stats: {
           careerProgress: roadmapProgress,
-          learningStreak: progressData?.dashboard?.currentStreak || 0,
-          applications: opportunitiesData?.summary?.eligible || 0,
-          skillsEarned: Math.floor(roadmapProgress / 25) + 2,
+          learningStreak: currentStreak,
+          applications: eligibleOpportunities.length,
+          skillsEarned: skillPassportData?.entries?.length || 0,
         },
-        roadmap: {
-          progress: roadmapProgress,
-          currentStep: progressData?.dashboard?.roadmapProgress?.currentStep || 0,
+        roadmap: roadmapData?.roadmap ? {
+          progress: roadmapData.roadmap.completionPercent || 0,
+          currentStep: roadmapData.roadmap.currentStep || 0,
           totalSteps: 5,
-          milestones: [
-            { id: 1, title: "Foundation Setup", status: roadmapProgress >= 20 ? "completed" : roadmapProgress > 0 ? "current" : "future", description: "Complete basic preparations" },
-            { id: 2, title: "Skill Development", status: roadmapProgress >= 40 ? "completed" : roadmapProgress >= 20 ? "current" : "future", description: "Build core competencies" },
-            { id: 3, title: "Portfolio Creation", status: roadmapProgress >= 60 ? "completed" : roadmapProgress >= 40 ? "current" : "future", description: "Showcase your abilities" },
-            { id: 4, title: "Network Building", status: roadmapProgress >= 80 ? "completed" : roadmapProgress >= 60 ? "current" : "future", description: "Connect with opportunities" },
-            { id: 5, title: "Career Launch", status: roadmapProgress >= 100 ? "completed" : roadmapProgress >= 80 ? "current" : "future", description: "Secure your comeback" },
-          ],
-        },
-        skillPassport: {
-          atsScore: 85 + Math.floor(roadmapProgress / 10),
-          skills: ["Budget Management", "Communication", "Crisis Management", "Operations Planning"],
-          summary: "Resourceful professional with hands-on experience in budget management and communication...",
-        },
-        opportunities: opportunitiesData?.matches?.eligible?.slice(0, 6).map((opp: any) => ({
+          milestones: generateMilestones(roadmapData.roadmap),
+        } : null,
+        skillPassport: skillPassportData?.content ? {
+          atsScore: skillPassportData.content.atsScore || 0,
+          skills: skillPassportData.entries?.map((e: any) => e.mappedSkill) || [],
+          summary: skillPassportData.content.resumeSummary || "",
+        } : null,
+        opportunities: eligibleOpportunities.slice(0, 6).map((opp: any) => ({
           id: opp.id,
           title: opp.title,
           organization: opp.organization,
           eligibility: opp.matchStatus || "eligible",
-          deadline: opp.deadline || "TBD",
-          country: Array.isArray(opp.region) ? opp.region[0] : (opp.region || "Global"),
-          funding: opp.type === "scholarship" ? "Full funding" : "Various amounts",
+          deadline: opp.deadline || "Rolling",
+          country: Array.isArray(opp.region) ? opp.region[0] : opp.region || "Global",
+          funding: opp.funding || "Various",
           status: "eligible" as const,
-        })) || [],
+        })),
         dreamTracker: {
-          todaysTask: progressData?.dashboard?.todaysTasks?.[0] || "Review your roadmap progress",
-          weeklyGoal: "Complete 3 roadmap milestones and apply to 2 opportunities",
-          streak: progressData?.dashboard?.currentStreak || 0,
-          xp: (progressData?.dashboard?.analytics?.totalTasks || 0) * 50,
-          achievements: [
-            { id: "first_step", title: "First Step Taken", earned: roadmapProgress > 0, icon: "🎯" },
-            { id: "streak_3", title: "3-Day Streak", earned: (progressData?.dashboard?.currentStreak || 0) >= 3, icon: "🔥" },
-            { id: "skill_mapper", title: "Skill Mapper", earned: true, icon: "🗺️" },
-            { id: "opportunity_hunter", title: "Opportunity Hunter", earned: (opportunitiesData?.summary?.eligible || 0) > 0, icon: "🎯" },
-          ],
+          todaysTask: progressData?.dashboard?.todaysTasks?.[0] || "Complete your onboarding",
+          weeklyGoal: "Complete 3 roadmap steps",
+          streak: currentStreak,
+          xp: totalXP,
+          achievements: calculateAchievements(roadmapProgress, currentStreak, eligibleOpportunities.length),
         },
       };
 
-      setDashboardData(mockData);
-    } catch (error) {
-      console.error("Error loading dashboard:", error);
-      // Set minimal mock data for demo
-      setDashboardData({
-        user: { name: "Priya", avatar: "👩‍💼", level: 1, xp: 150, maxXp: 1000 },
-        stats: { careerProgress: 15, learningStreak: 2, applications: 3, skillsEarned: 4 },
-        roadmap: {
-          progress: 15,
-          currentStep: 1,
-          totalSteps: 5,
-          milestones: [
-            { id: 1, title: "Foundation Setup", status: "current", description: "Complete basic preparations" },
-            { id: 2, title: "Skill Development", status: "future", description: "Build core competencies" },
-            { id: 3, title: "Portfolio Creation", status: "future", description: "Showcase your abilities" },
-            { id: 4, title: "Network Building", status: "future", description: "Connect with opportunities" },
-            { id: 5, title: "Career Launch", status: "future", description: "Secure your comeback" },
-          ],
-        },
-        skillPassport: { atsScore: 87, skills: ["Budget Management", "Communication"], summary: "Experienced professional..." },
-        opportunities: [
-          {
-            id: "1",
-            title: "Women Entrepreneurs Grant",
-            organization: "Ministry of MSME",
-            eligibility: "Women entrepreneurs",
-            deadline: "2024-03-15",
-            country: "India",
-            funding: "₹5,00,000",
-            status: "eligible" as const,
-          },
-          {
-            id: "2", 
-            title: "Digital Skills Scholarship",
-            organization: "Google",
-            eligibility: "Basic computer knowledge",
-            deadline: "2024-02-28",
-            country: "Global",
-            funding: "Free course + certification",
-            status: "eligible" as const,
-          },
-          {
-            id: "3",
-            title: "Small Business Loan",
-            organization: "SBI Bank",
-            eligibility: "Existing business plan",
-            deadline: "2024-04-10",
-            country: "India",
-            funding: "₹2,00,000",
-            status: "almost" as const,
-          },
-        ],
-        dreamTracker: {
-          todaysTask: "Complete digital literacy module",
-          weeklyGoal: "Finish foundation setup",
-          streak: 2,
-          xp: 150,
-          achievements: [
-            { id: "first_step", title: "First Step Taken", earned: true, icon: "🎯" },
-            { id: "streak_3", title: "3-Day Streak", earned: false, icon: "🔥" },
-          ],
-        },
-      });
+      setDashboardData(data);
+    } catch (err) {
+      console.error("Error loading dashboard:", err);
+      setError(err instanceof Error ? err.message : "Failed to load dashboard");
     } finally {
       setLoading(false);
     }
   };
 
-  useEffect(() => {
-    loadDashboardData();
-  }, [router]);
+  // Helper: Generate roadmap milestones
+  function generateMilestones(roadmap: any) {
+    const progress = roadmap.completionPercent || 0;
+    const milestones = [
+      { id: 1, title: "Foundation Setup", description: "Complete basic preparations" },
+      { id: 2, title: "Skill Development", description: "Build core competencies" },
+      { id: 3, title: "Portfolio Creation", description: "Showcase your abilities" },
+      { id: 4, title: "Network Building", description: "Connect with opportunities" },
+      { id: 5, title: "Career Launch", description: "Secure your comeback" },
+    ];
 
-  if (loading) {
+    return milestones.map((m, i) => ({
+      ...m,
+      status: progress >= (i + 1) * 20 ? "completed" : progress >= i * 20 ? "current" : "future",
+    })) as Array<{ id: number; title: string; status: "completed" | "current" | "future"; description: string }>;
+  }
+
+  // Helper: Calculate achievements
+  function calculateAchievements(progress: number, streak: number, opportunities: number) {
+    return [
+      { id: "first_step", title: "First Step", earned: progress > 0, icon: "🎯" },
+      { id: "streak_3", title: "3-Day Streak", earned: streak >= 3, icon: "🔥" },
+      { id: "skill_mapper", title: "Skill Mapper", earned: progress >= 20, icon: "🗺️" },
+      { id: "opportunity_hunter", title: "Opportunity Hunter", earned: opportunities > 0, icon: "🎯" },
+    ];
+  }
+
+  // Loading State
+  if (!isLoaded || loading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-[#FCFBFF] to-[#F8F6FF] flex items-center justify-center">
         <motion.div
@@ -292,16 +238,42 @@ export default function Dashboard() {
           >
             <span className="text-4xl">🔮</span>
           </motion.div>
-          <h2 className="text-2xl font-semibold text-gray-800 mb-2">Preparing Your Dashboard</h2>
-          <p className="text-gray-600">Creating your personalized experience...</p>
+          <h2 className="text-2xl font-semibold text-gray-800 mb-2">Loading Your Dashboard</h2>
+          <p className="text-gray-600">Preparing your personalized experience...</p>
         </motion.div>
       </div>
     );
   }
 
+  // Error State
+  if (error) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-[#FCFBFF] to-[#F8F6FF] flex items-center justify-center p-6">
+        <motion.div
+          className="max-w-md w-full bg-white/60 backdrop-blur-xl border border-white/30 rounded-3xl p-8 shadow-2xl text-center"
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+        >
+          <div className="text-6xl mb-4">⚠️</div>
+          <h2 className="text-2xl font-bold text-gray-800 mb-4">Oops! Something went wrong</h2>
+          <p className="text-gray-600 mb-6">{error}</p>
+          <button
+            onClick={() => loadDashboardData()}
+            className="px-6 py-3 bg-gradient-to-r from-purple-500 to-pink-500 text-white font-semibold rounded-xl shadow-lg hover:shadow-xl transition-all"
+          >
+            Try Again
+          </button>
+        </motion.div>
+      </div>
+    );
+  }
+
+  // No Data - Should not happen if auth works
   if (!dashboardData) {
     return null;
   }
+
+  const phoenixProgress = dashboardData.roadmap?.progress || 0;
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-[#FCFBFF] to-[#F8F6FF]">
@@ -309,66 +281,47 @@ export default function Dashboard() {
       <div className="fixed inset-0 overflow-hidden pointer-events-none">
         <motion.div
           className="absolute top-20 left-20 w-64 h-64 bg-gradient-to-br from-purple-200/30 to-pink-200/30 rounded-full blur-3xl"
-          animate={{
-            x: [0, 50, 0],
-            y: [0, -30, 0],
-          }}
-          transition={{
-            duration: 20,
-            repeat: Infinity,
-            ease: "easeInOut",
-          }}
+          animate={{ x: [0, 50, 0], y: [0, -30, 0] }}
+          transition={{ duration: 20, repeat: Infinity, ease: "easeInOut" }}
         />
         <motion.div
           className="absolute bottom-20 right-20 w-96 h-96 bg-gradient-to-br from-indigo-200/30 to-purple-200/30 rounded-full blur-3xl"
-          animate={{
-            x: [0, -40, 0],
-            y: [0, 40, 0],
-          }}
-          transition={{
-            duration: 25,
-            repeat: Infinity,
-            ease: "easeInOut",
-          }}
+          animate={{ x: [0, -40, 0], y: [0, 40, 0] }}
+          transition={{ duration: 25, repeat: Infinity, ease: "easeInOut" }}
         />
       </div>
 
       {/* Main Layout */}
       <div className="flex">
-        {/* Left Sidebar */}
         <Sidebar />
 
-        {/* Main Content */}
         <div className="flex-1 ml-80">
-          {/* Top Navbar */}
-          <TopNavbar user={dashboardData.user} />
+          <TopNavbar user={{ name: dashboardData.user.name, avatar: dashboardData.user.imageUrl || '' }} />
 
-          {/* Dashboard Content */}
           <main className="p-8 pt-6">
-            {/* Hero Section */}
             <HeroSection phoenixProgress={phoenixProgress} />
-
-            {/* Stats Cards */}
             <StatsCards stats={dashboardData.stats} />
 
-            {/* Main Dashboard Grid */}
             <div className="grid grid-cols-12 gap-8 mt-8">
-              {/* Left Column */}
               <div className="col-span-8 space-y-8">
-                {/* Roadmap Card */}
-                <RoadmapCard roadmap={dashboardData.roadmap} />
+                {dashboardData.roadmap ? (
+                  <RoadmapCard roadmap={dashboardData.roadmap} />
+                ) : (
+                  <EmptyRoadmap />
+                )}
                 
-                {/* Skill Passport & Opportunity Cards */}
                 <div className="grid grid-cols-2 gap-8">
-                  <SkillPassportCard skillPassport={dashboardData.skillPassport} />
+                  {dashboardData.skillPassport ? (
+                    <SkillPassportCard skillPassport={dashboardData.skillPassport} />
+                  ) : (
+                    <EmptySkillPassport />
+                  )}
                   <DreamTrackerCard dreamTracker={dashboardData.dreamTracker} />
                 </div>
 
-                {/* Opportunity Radar */}
                 <OpportunityRadar opportunities={dashboardData.opportunities} />
               </div>
 
-              {/* Right Column */}
               <div className="col-span-4">
                 <RightSidebar />
               </div>
@@ -377,8 +330,50 @@ export default function Dashboard() {
         </div>
       </div>
 
-      {/* Phoenix Orb - Floating 3D element */}
       <PhoenixOrb progress={phoenixProgress} />
     </div>
+  );
+}
+
+// Empty State Components
+function EmptyRoadmap() {
+  const router = useRouter();
+  return (
+    <motion.div
+      className="bg-white/60 backdrop-blur-xl border border-white/30 rounded-3xl p-12 shadow-2xl text-center"
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+    >
+      <div className="text-6xl mb-4">🗺️</div>
+      <h3 className="text-2xl font-bold text-gray-800 mb-2">No Roadmap Yet</h3>
+      <p className="text-gray-600 mb-6">Generate your personalized AI roadmap to get started</p>
+      <button
+        onClick={() => router.push("/roadmap")}
+        className="px-6 py-3 bg-gradient-to-r from-purple-500 to-pink-500 text-white font-semibold rounded-xl shadow-lg hover:shadow-xl transition-all"
+      >
+        Generate Roadmap
+      </button>
+    </motion.div>
+  );
+}
+
+function EmptySkillPassport() {
+  const router = useRouter();
+  return (
+    <motion.div
+      className="bg-white/60 backdrop-blur-xl border border-white/30 rounded-2xl p-6 shadow-xl text-center"
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+    >
+      <div className="text-4xl mb-3">📋</div>
+      <h4 className="font-bold text-gray-800 mb-2">No Skill Passport</h4>
+      <p className="text-sm text-gray-600 mb-4">Transform your life skills into professional assets</p>
+      <button
+        onClick={() => router.push("/skill-passport")}
+        className="px-4 py-2 bg-gradient-to-r from-purple-500 to-pink-500 text-white text-sm font-semibold rounded-lg shadow-lg hover:shadow-xl transition-all"
+      >
+        Create Passport
+      </button>
+    </motion.div>
   );
 }

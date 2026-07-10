@@ -1,10 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { z } from 'zod';
 import { prisma } from '@/lib/prisma';
-
-const matchRequestSchema = z.object({
-  userId: z.string().cuid(),
-});
+import { requireAuth } from '@/lib/auth';
 
 interface MatchResult {
   eligible: OpportunityWithMatch[];
@@ -115,16 +111,15 @@ function calculateOpportunityMatch(
 
 export async function POST(request: NextRequest) {
   try {
-    const body = await request.json();
-    const { userId } = matchRequestSchema.parse(body);
+    const user = await requireAuth();
 
     // Get user profile and progress
     const [profile, progressLog] = await Promise.all([
       prisma.profile.findUnique({
-        where: { userId },
+        where: { userId: user.id },
       }),
       prisma.progressLog.findFirst({
-        where: { userId },
+        where: { userId: user.id },
         orderBy: { date: 'desc' },
       })
     ]);
@@ -133,7 +128,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(
         {
           success: false,
-          error: 'User profile not found',
+          error: 'Profile not found. Please complete onboarding.',
         },
         { status: 404 }
       );
@@ -165,7 +160,7 @@ export async function POST(request: NextRequest) {
       await prisma.opportunityMatch.upsert({
         where: {
           userId_opportunityId: {
-            userId,
+            userId: user.id,
             opportunityId: opportunity.id
           }
         },
@@ -175,7 +170,7 @@ export async function POST(request: NextRequest) {
           updatedAt: new Date()
         },
         create: {
-          userId,
+          userId: user.id,
           opportunityId: opportunity.id,
           status: match.status,
           missingCriteria: match.missingCriteria
@@ -210,22 +205,11 @@ export async function POST(request: NextRequest) {
     });
 
   } catch (error) {
-    if (error instanceof z.ZodError) {
-      return NextResponse.json(
-        {
-          success: false,
-          error: 'Invalid request data',
-          details: error.issues,
-        },
-        { status: 400 }
-      );
-    }
-
     console.error('Error matching opportunities:', error);
     return NextResponse.json(
       {
         success: false,
-        error: 'Failed to match opportunities',
+        error: error instanceof Error ? error.message : 'Failed to match opportunities',
       },
       { status: 500 }
     );

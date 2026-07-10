@@ -1,20 +1,18 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
+import { requireAuth } from '@/lib/auth';
 
-export async function GET(
-  request: NextRequest,
-  { params }: { params: Promise<{ userId: string }> }
-) {
+export async function GET(request: NextRequest) {
   try {
-    const { userId } = await params;
+    const user = await requireAuth();
 
     const [skillEntries, generatedContent] = await Promise.all([
       prisma.skillPassportEntry.findMany({
-        where: { userId },
+        where: { userId: user.id },
         orderBy: { createdAt: 'asc' },
       }),
       prisma.generatedContent.findUnique({
-        where: { userId },
+        where: { userId: user.id },
       }),
     ]);
 
@@ -28,7 +26,7 @@ export async function GET(
     return NextResponse.json(
       {
         success: false,
-        error: 'Failed to fetch skill passport',
+        error: error instanceof Error ? error.message : 'Failed to fetch skill passport',
       },
       { status: 500 }
     );
