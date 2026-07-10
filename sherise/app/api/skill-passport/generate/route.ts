@@ -164,6 +164,7 @@ Make each piece specific to HER skills and goal — no generic filler.`;
 
   } catch (error) {
     if (error instanceof z.ZodError) {
+      console.error('Validation error:', error.issues);
       return NextResponse.json(
         { success: false, error: 'Validation error', details: error.issues },
         { status: 400 }
@@ -171,8 +172,9 @@ Make each piece specific to HER skills and goal — no generic filler.`;
     }
 
     console.error('Error generating skill passport:', error);
+    const errorMessage = error instanceof Error ? error.message : String(error);
     return NextResponse.json(
-      { success: false, error: 'Failed to generate skill passport' },
+      { success: false, error: `Failed to generate skill passport: ${errorMessage}` },
       { status: 500 }
     );
   }

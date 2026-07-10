@@ -25,6 +25,7 @@ export default function SkillPassport() {
   const [generatedContent, setGeneratedContent] = useState<GeneratedContent | null>(null);
   const [loading, setLoading] = useState(true);
   const [generating, setGenerating] = useState(false);
+  const [selectedRoles, setSelectedRoles] = useState<string[]>([]);
 
   useEffect(() => {
     if (!isLoaded) return;
@@ -40,15 +41,20 @@ export default function SkillPassport() {
   const fetchSkillPassport = async () => {
     try {
       setLoading(true);
-      const response = await fetch(`/api/skill-passport/${user!.id}`);
+      const response = await fetch("/api/skill-passport");
       
       if (response.ok) {
         const data = await response.json();
-        if (data.entries) {
-          setSkillEntries(data.entries);
+        if (data.skillEntries) {
+          setSkillEntries(data.skillEntries);
         }
-        if (data.content) {
-          setGeneratedContent(data.content);
+        if (data.generatedContent) {
+          setGeneratedContent({
+            resumeSummary: data.generatedContent.resumeSummary || "",
+            bio: data.generatedContent.bio || "",
+            elevatorPitch: data.generatedContent.elevatorPitch || "",
+            atsScore: 85,
+          });
         }
       }
     } catch (error) {
@@ -59,24 +65,29 @@ export default function SkillPassport() {
   };
 
   const generatePassport = async () => {
+    // Default roles if none selected
+    const rolesToSend = selectedRoles.length > 0 ? selectedRoles : ['homemaker', 'caregiver', 'tutor'];
+    
     try {
       setGenerating(true);
       const response = await fetch("/api/skill-passport/generate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ selectedRoles: rolesToSend }),
       });
 
       if (response.ok) {
         const data = await response.json();
-        setSkillEntries(data.mappings || []);
+        setSkillEntries(data.skillEntries || data.mappings || []);
         setGeneratedContent({
-          resumeSummary: data.resumeSummary,
-          bio: data.bio,
-          elevatorPitch: data.elevatorPitch,
-          atsScore: data.atsScore || 85,
+          resumeSummary: data.generatedContent?.resumeSummary || data.resumeSummary || "",
+          bio: data.generatedContent?.bio || data.bio || "",
+          elevatorPitch: data.generatedContent?.elevatorPitch || data.elevatorPitch || "",
+          atsScore: 85,
         });
       } else {
-        alert("Failed to generate skill passport. Please try again.");
+        const errorData = await response.json().catch(() => ({}));
+        alert(`Failed to generate skill passport: ${errorData.error || 'Unknown error'}`);
       }
     } catch (error) {
       console.error("Error generating skill passport:", error);
@@ -98,6 +109,15 @@ export default function SkillPassport() {
   }
 
   if (skillEntries.length === 0 && !generatedContent) {
+    const availableRoles = [
+      { id: 'homemaker', label: 'Homemaker' },
+      { id: 'caregiver', label: 'Caregiver' },
+      { id: 'cook', label: 'Cook' },
+      { id: 'tutor', label: 'Tutor' },
+      { id: 'tailor', label: 'Tailor' },
+      { id: 'organizer', label: 'Organizer' },
+    ];
+
     return (
       <div className="min-h-screen py-12 px-6">
         <div className="max-w-4xl mx-auto text-center">
@@ -113,9 +133,36 @@ export default function SkillPassport() {
             <p className="text-gray-600 mb-8 max-w-2xl mx-auto">
               Transform your life experiences into professional skills that employers value.
             </p>
+            
+            {/* Role Selection */}
+            <div className="mb-8 text-left">
+              <h3 className="text-lg font-semibold text-gray-800 mb-4">Select your life roles:</h3>
+              <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                {availableRoles.map((role) => (
+                  <button
+                    key={role.id}
+                    onClick={() => {
+                      setSelectedRoles((prev) =>
+                        prev.includes(role.id)
+                          ? prev.filter((r) => r !== role.id)
+                          : [...prev, role.id]
+                      );
+                    }}
+                    className={`p-4 rounded-lg font-medium transition-all ${
+                      selectedRoles.includes(role.id)
+                        ? 'bg-purple-500 text-white shadow-lg'
+                        : 'bg-gray-100 text-gray-800 hover:bg-gray-200'
+                    }`}
+                  >
+                    {role.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
             <button
               onClick={generatePassport}
-              disabled={generating}
+              disabled={generating || selectedRoles.length === 0}
               className="clay-button px-8 py-4 text-white font-medium disabled:opacity-50"
             >
               {generating ? "Generating..." : "Generate Skill Passport"}

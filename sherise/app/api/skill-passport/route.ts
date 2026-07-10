@@ -18,6 +18,39 @@ const skillPassportSchema = z.object({
   }),
 });
 
+// GET: Fetch authenticated user's skill passport
+export async function GET(request: NextRequest) {
+  try {
+    const user = await requireAuth();
+
+    const [skillEntries, generatedContent] = await Promise.all([
+      prisma.skillPassportEntry.findMany({
+        where: { userId: user.id },
+        orderBy: { createdAt: 'asc' },
+      }),
+      prisma.generatedContent.findUnique({
+        where: { userId: user.id },
+      }),
+    ]);
+
+    return NextResponse.json({
+      success: true,
+      skillEntries,
+      generatedContent,
+    });
+  } catch (error) {
+    console.error('Error fetching skill passport:', error);
+    return NextResponse.json(
+      {
+        success: false,
+        error: error instanceof Error ? error.message : 'Failed to fetch skill passport',
+      },
+      { status: 500 }
+    );
+  }
+}
+
+// POST: Create or update authenticated user's skill passport
 export async function POST(request: NextRequest) {
   try {
     const user = await requireAuth();
