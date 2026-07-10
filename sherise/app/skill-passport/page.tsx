@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import { useRouter } from "next/navigation";
-import { useUser } from "@clerk/nextjs";
+import { useUser, useAuth } from "@clerk/nextjs";
 
 interface SkillEntry {
   lifeRole: string;
@@ -21,6 +21,7 @@ interface GeneratedContent {
 export default function SkillPassport() {
   const router = useRouter();
   const { user, isLoaded } = useUser();
+  const { getToken } = useAuth();
   const [skillEntries, setSkillEntries] = useState<SkillEntry[]>([]);
   const [generatedContent, setGeneratedContent] = useState<GeneratedContent | null>(null);
   const [loading, setLoading] = useState(true);
@@ -41,7 +42,14 @@ export default function SkillPassport() {
   const fetchSkillPassport = async () => {
     try {
       setLoading(true);
-      const response = await fetch("/api/skill-passport");
+      const token = await getToken();
+      if (!token) throw new Error("Failed to get authentication token");
+
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
+      const response = await fetch(`${apiUrl}/api/skill-passport`, {
+        method: 'GET',
+        headers: { 'Authorization': `Bearer ${token}` },
+      });
       
       if (response.ok) {
         const data = await response.json();
@@ -70,9 +78,16 @@ export default function SkillPassport() {
     
     try {
       setGenerating(true);
-      const response = await fetch("/api/skill-passport/generate", {
+      const token = await getToken();
+      if (!token) throw new Error("Failed to get authentication token");
+
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
+      const response = await fetch(`${apiUrl}/api/skill-passport/generate`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { 
+          'Authorization': `Bearer ${token}`,
+          "Content-Type": "application/json" 
+        },
         body: JSON.stringify({ selectedRoles: rolesToSend }),
       });
 

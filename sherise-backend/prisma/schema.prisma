@@ -1,0 +1,178 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider   = "prisma-client-js"
+  engineType = "library"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// User model synced with Clerk
+model User {
+  id        String   @id // Clerk User ID (e.g., user_2abc123...)
+  email     String   @unique
+  name      String
+  imageUrl  String?
+  username  String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  profile             Profile?
+  roadmaps            Roadmap[]
+  skillPassportEntries SkillPassportEntry[]
+  generatedContents   GeneratedContent[]
+  opportunityMatches  OpportunityMatch[]
+  progressLogs        ProgressLog[]
+  savedOpportunities  SavedOpportunity[]
+
+  @@map("users")
+}
+
+model Profile {
+  id                   String  @id @default(cuid())
+  age                  Int
+  country              String
+  educationLevel       String
+  reasonStopped        String
+  skills               String
+  interests            String
+  hoursPerDay          String
+  internetAvailability String  // "none" | "low" | "stable"
+  careerGoal           String
+  
+  userId    String   @unique
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("profiles")
+}
+
+model Roadmap {
+  id                String   @id @default(cuid())
+  currentSituation  String
+  steps             Json     // Array of {title, description, icon, status, completed}
+  timelineMonths    String
+  completionPercent Int      @default(0)
+  currentStep       Int      @default(0)
+  
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("roadmaps")
+}
+
+model SkillPassportEntry {
+  id            String @id @default(cuid())
+  lifeRole      String
+  mappedSkill   String
+  justification String
+  
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+
+  @@map("skill_passport_entries")
+}
+
+model GeneratedContent {
+  id             String @id @default(cuid())
+  resumeSummary  String
+  bio            String
+  elevatorPitch  String
+  atsScore       Int    @default(0)
+  
+  userId    String   @unique
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("generated_contents")
+}
+
+model Opportunity {
+  id           String  @id @default(cuid())
+  title        String
+  organization String
+  type         String  // "scholarship" | "grant" | "internship" | "job" | "program"
+  description  String
+  region       String[] // Array of allowed regions
+  minAge       Int?
+  maxAge       Int?
+  minEducation String[] // Array of allowed education levels
+  tags         String[] // Skills or interests tags
+  url          String
+  deadline     String?
+  funding      String?
+  
+  createdAt DateTime @default(now())
+  
+  opportunityMatches OpportunityMatch[]
+  savedOpportunities SavedOpportunity[]
+
+  @@map("opportunities")
+}
+
+model OpportunityMatch {
+  id              String   @id @default(cuid())
+  status          String   // "eligible" | "almost" | "future"
+  missingCriteria String[] // Array of missing criteria for "almost" status
+  
+  userId        String
+  user          User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  opportunityId String
+  opportunity   Opportunity  @relation(fields: [opportunityId], references: [id], onDelete: Cascade)
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
+
+  @@unique([userId, opportunityId])
+  @@map("opportunity_matches")
+}
+
+model SavedOpportunity {
+  id            String      @id @default(cuid())
+  userId        String
+  user          User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  opportunityId String
+  opportunity   Opportunity @relation(fields: [opportunityId], references: [id], onDelete: Cascade)
+  appliedAt     DateTime?
+  status        String      @default("saved") // "saved" | "applied" | "accepted" | "rejected"
+  notes         String?
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+
+  @@unique([userId, opportunityId])
+  @@map("saved_opportunities")
+}
+
+model ProgressLog {
+  id               String   @id @default(cuid())
+  date             DateTime @default(now())
+  tasksCompleted   Int      @default(0)
+  confidenceScore  Int      @default(5)
+  streakCount      Int      @default(0)
+  currentStepIndex Int      @default(0) // Which step in the roadmap they're on
+  xpEarned         Int      @default(0)
+  
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("progress_logs")
+}
+
+model Achievement {
+  id          String   @id @default(cuid())
+  userId      String
+  title       String
+  description String
+  icon        String
+  earnedAt    DateTime @default(now())
+  category    String   // "milestone" | "streak" | "skill" | "application"
+
+  @@map("achievements")
+}

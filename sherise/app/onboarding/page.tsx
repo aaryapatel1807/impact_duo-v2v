@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { motion } from "framer-motion";
 import { useRouter } from "next/navigation";
-import { useUser } from "@clerk/nextjs";
+import { useUser, useAuth } from "@clerk/nextjs";
 
 interface OnboardingData {
   age: string;
@@ -20,6 +20,7 @@ interface OnboardingData {
 export default function Onboarding() {
   const router = useRouter();
   const { user, isLoaded } = useUser();
+  const { getToken } = useAuth();
   const [formData, setFormData] = useState<OnboardingData>({
     age: "",
     country: "",
@@ -53,11 +54,21 @@ export default function Onboarding() {
     setIsSubmitting(true);
 
     try {
-      // Save profile to database using authenticated user
+      const token = await getToken();
+      if (!token) {
+        throw new Error("Failed to get authentication token");
+      }
+
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
+
+      // Save profile to backend using authenticated user
       const parsedAge = parseInt(formData.age, 10);
-      const response = await fetch("/api/profile", {
+      const response = await fetch(`${apiUrl}/api/profile`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { 
+          'Authorization': `Bearer ${token}`,
+          "Content-Type": "application/json" 
+        },
         body: JSON.stringify({
           age: isNaN(parsedAge) ? formData.age : parsedAge,
           country: formData.country,

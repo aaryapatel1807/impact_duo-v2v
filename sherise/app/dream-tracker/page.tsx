@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import { useRouter } from "next/navigation";
-import { useUser } from "@clerk/nextjs";
+import { useUser, useAuth } from "@clerk/nextjs";
 
 interface DashboardData {
   currentStreak: number;
@@ -19,6 +19,7 @@ interface DashboardData {
 export default function DreamTracker() {
   const router = useRouter();
   const { user, isLoaded } = useUser();
+  const { getToken } = useAuth();
   const [dashboardData, setDashboardData] = useState<DashboardData | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -36,7 +37,14 @@ export default function DreamTracker() {
   const fetchProgress = async () => {
     try {
       setLoading(true);
-      const response = await fetch(`/api/progress/${user!.id}`);
+      const token = await getToken();
+      if (!token) throw new Error("Failed to get authentication token");
+
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
+      const response = await fetch(`${apiUrl}/api/progress`, {
+        method: 'GET',
+        headers: { 'Authorization': `Bearer ${token}` },
+      });
       
       if (response.ok) {
         const data = await response.json();
@@ -51,9 +59,16 @@ export default function DreamTracker() {
 
   const updateTask = async () => {
     try {
-      const response = await fetch("/api/progress/update", {
+      const token = await getToken();
+      if (!token) throw new Error("Failed to get authentication token");
+
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
+      const response = await fetch(`${apiUrl}/api/progress/update`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { 
+          'Authorization': `Bearer ${token}`,
+          "Content-Type": "application/json" 
+        },
         body: JSON.stringify({
           tasksCompleted: 1,
           confidenceScore: 7,

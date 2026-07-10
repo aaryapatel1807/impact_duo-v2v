@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import { useRouter } from "next/navigation";
-import { useUser } from "@clerk/nextjs";
+import { useUser, useAuth } from "@clerk/nextjs";
 import Sidebar from "@/components/dashboard/Sidebar";
 import TopNavbar from "@/components/dashboard/TopNavbar";
 import HeroSection from "@/components/dashboard/HeroSection";
@@ -75,6 +75,7 @@ interface DashboardData {
 export default function Dashboard() {
   const router = useRouter();
   const { user: clerkUser, isLoaded } = useUser();
+  const { getToken } = useAuth();
   const [dashboardData, setDashboardData] = useState<DashboardData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -103,8 +104,18 @@ export default function Dashboard() {
       setLoading(true);
       setError(null);
 
-      // Fetch user profile
-      const profileRes = await fetch("/api/profile");
+      const token = await getToken();
+      if (!token) {
+        throw new Error("Failed to get authentication token");
+      }
+
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
+
+      // Fetch user profile from backend
+      const profileRes = await fetch(`${apiUrl}/api/profile`, {
+        method: 'GET',
+        headers: { 'Authorization': `Bearer ${token}` },
+      });
       const profileData = await profileRes.json();
 
       if (!profileData.success) {
@@ -119,23 +130,34 @@ export default function Dashboard() {
         return;
       }
 
-      // Fetch progress data
-      const progressRes = await fetch("/api/progress");
+      // Fetch progress data from backend
+      const progressRes = await fetch(`${apiUrl}/api/progress`, {
+        method: 'GET',
+        headers: { 'Authorization': `Bearer ${token}` },
+      });
       const progressData = progressRes.ok ? await progressRes.json() : null;
 
-      // Fetch roadmap
-      const roadmapRes = await fetch("/api/roadmap");
+      // Fetch roadmap from backend
+      const roadmapRes = await fetch(`${apiUrl}/api/roadmap`, {
+        method: 'GET',
+        headers: { 'Authorization': `Bearer ${token}` },
+      });
       const roadmapData = roadmapRes.ok ? await roadmapRes.json() : null;
 
-      // Fetch skill passport
-      const skillPassportRes = await fetch("/api/skill-passport");
+      // Fetch skill passport from backend
+      const skillPassportRes = await fetch(`${apiUrl}/api/skill-passport`, {
+        method: 'GET',
+        headers: { 'Authorization': `Bearer ${token}` },
+      });
       const skillPassportData = skillPassportRes.ok ? await skillPassportRes.json() : null;
 
-      // Fetch matched opportunities
-      const opportunitiesRes = await fetch("/api/opportunities/match", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({}),
+      // Fetch matched opportunities from backend
+      const opportunitiesRes = await fetch(`${apiUrl}/api/opportunities/match`, {
+        method: 'POST',
+        headers: { 
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
       });
       const opportunitiesData = opportunitiesRes.ok ? await opportunitiesRes.json() : null;
 

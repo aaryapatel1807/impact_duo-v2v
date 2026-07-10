@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import { useRouter } from "next/navigation";
-import { useUser } from "@clerk/nextjs";
+import { useUser, useAuth } from "@clerk/nextjs";
 
 interface Opportunity {
   id: string;
@@ -21,6 +21,7 @@ interface Opportunity {
 export default function OpportunityRadar() {
   const router = useRouter();
   const { user, isLoaded } = useUser();
+  const { getToken } = useAuth();
   const [opportunities, setOpportunities] = useState<Opportunity[]>([]);
   const [filter, setFilter] = useState<"all" | "eligible" | "almost" | "future">("all");
   const [loading, setLoading] = useState(true);
@@ -39,10 +40,16 @@ export default function OpportunityRadar() {
   const fetchOpportunities = async () => {
     try {
       setLoading(true);
-      const response = await fetch("/api/opportunities/match", {
+      const token = await getToken();
+      if (!token) throw new Error("Failed to get authentication token");
+
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
+      const response = await fetch(`${apiUrl}/api/opportunities/match`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ userId: user!.id }),
+        headers: { 
+          'Authorization': `Bearer ${token}`,
+          "Content-Type": "application/json" 
+        },
       });
 
       if (response.ok) {

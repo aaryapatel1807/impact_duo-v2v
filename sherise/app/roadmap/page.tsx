@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import { useRouter } from "next/navigation";
-import { useUser } from "@clerk/nextjs";
+import { useUser, useAuth } from "@clerk/nextjs";
 
 interface RoadmapStep {
   title: string;
@@ -21,6 +21,7 @@ interface RoadmapData {
 export default function Roadmap() {
   const router = useRouter();
   const { user, isLoaded } = useUser();
+  const { getToken } = useAuth();
   const [roadmapData, setRoadmapData] = useState<RoadmapData | null>(null);
   const [loading, setLoading] = useState(true);
   const [generating, setGenerating] = useState(false);
@@ -39,7 +40,14 @@ export default function Roadmap() {
   const fetchRoadmap = async () => {
     try {
       setLoading(true);
-      const response = await fetch(`/api/roadmap/${user!.id}`);
+      const token = await getToken();
+      if (!token) throw new Error("Failed to get authentication token");
+
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
+      const response = await fetch(`${apiUrl}/api/roadmap`, {
+        method: 'GET',
+        headers: { 'Authorization': `Bearer ${token}` },
+      });
       
       if (response.ok) {
         const data = await response.json();
@@ -61,9 +69,16 @@ export default function Roadmap() {
   const generateRoadmap = async () => {
     try {
       setGenerating(true);
-      const response = await fetch("/api/roadmap/generate", {
+      const token = await getToken();
+      if (!token) throw new Error("Failed to get authentication token");
+
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
+      const response = await fetch(`${apiUrl}/api/roadmap/generate`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { 
+          'Authorization': `Bearer ${token}`,
+          "Content-Type": "application/json" 
+        },
       });
 
       if (response.ok) {
