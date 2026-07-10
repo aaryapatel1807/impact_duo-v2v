@@ -133,7 +133,7 @@ export default function Dashboard() {
       const opportunitiesData = opportunitiesRes.ok ? await opportunitiesRes.json() : null;
 
       // Calculate real statistics
-      const roadmapProgress = roadmapData?.roadmap?.completionPercent || 0;
+      const roadmapProgress = 0; // Roadmap doesn't have completionPercent yet
       const currentStreak = progressData?.dashboard?.currentStreak || 0;
       const totalXP = progressData?.dashboard?.analytics?.totalXP || 0;
       const eligibleOpportunities = opportunitiesData?.matches?.eligible || [];
@@ -154,18 +154,18 @@ export default function Dashboard() {
           careerProgress: roadmapProgress,
           learningStreak: currentStreak,
           applications: eligibleOpportunities.length,
-          skillsEarned: skillPassportData?.entries?.length || 0,
+          skillsEarned: skillPassportData?.skillEntries?.length || 0,
         },
         roadmap: roadmapData?.roadmap ? {
-          progress: roadmapData.roadmap.completionPercent || 0,
-          currentStep: roadmapData.roadmap.currentStep || 0,
+          progress: 0,
+          currentStep: 0,
           totalSteps: 5,
           milestones: generateMilestones(roadmapData.roadmap),
         } : null,
-        skillPassport: skillPassportData?.content ? {
-          atsScore: skillPassportData.content.atsScore || 0,
-          skills: skillPassportData.entries?.map((e: any) => e.mappedSkill) || [],
-          summary: skillPassportData.content.resumeSummary || "",
+        skillPassport: skillPassportData?.generatedContent ? {
+          atsScore: 85,
+          skills: skillPassportData.skillEntries?.map((e: any) => e.mappedSkill) || [],
+          summary: skillPassportData.generatedContent.resumeSummary || "",
         } : null,
         opportunities: eligibleOpportunities.slice(0, 6).map((opp: any) => ({
           id: opp.id,

@@ -84,10 +84,10 @@ export function PhoenixOrb({ progress, onClick }: PhoenixOrbProps) {
   const phoenixState = getPhoenixState();
 
   return (
-    <div className="fixed bottom-8 right-8 z-40">
+    <div className="fixed bottom-8 right-8 z-40 pointer-events-none">
       {/* Main Phoenix Orb */}
       <motion.div
-        className="relative pointer-events-auto"
+        className="relative"
         animate={{
           y: [0, -10, 0],
         }}
@@ -127,13 +127,17 @@ export function PhoenixOrb({ progress, onClick }: PhoenixOrbProps) {
 
         {/* Main Orb */}
         <motion.div
-          className={`w-32 h-32 rounded-full bg-gradient-to-br ${phoenixState.color} shadow-2xl ${phoenixState.glow} flex items-center justify-center text-4xl backdrop-blur-sm border border-white/20 cursor-pointer pointer-events-auto`}
+          className={`w-32 h-32 rounded-full bg-gradient-to-br ${phoenixState.color} shadow-2xl ${phoenixState.glow} flex items-center justify-center text-4xl backdrop-blur-sm border border-white/20 cursor-pointer`}
           whileHover={{
             scale: 1.1,
             rotate: 5,
           }}
           whileTap={{ scale: 0.95 }}
-          onClick={onClick}
+          onClick={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            onClick?.();
+          }}
           animate={stage === 4 ? {
             rotate: [0, 360],
             scale: [1, 1.1, 1],
@@ -142,6 +146,7 @@ export function PhoenixOrb({ progress, onClick }: PhoenixOrbProps) {
             rotate: { duration: 10, repeat: Infinity, ease: "linear" },
             scale: { duration: 2, repeat: Infinity },
           } : {}}
+          style={{ pointerEvents: 'auto' }}
         >
           <motion.span
             key={stage}
