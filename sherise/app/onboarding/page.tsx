@@ -38,6 +38,12 @@ export default function Onboarding() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    // Prevent premature submission if the user presses "Enter" in an input field
+    if (currentStep < totalSteps - 1) {
+      handleNext();
+      return;
+    }
     
     if (!isLoaded || !user) {
       alert("Please sign in to continue");
@@ -48,11 +54,12 @@ export default function Onboarding() {
 
     try {
       // Save profile to database using authenticated user
+      const parsedAge = parseInt(formData.age, 10);
       const response = await fetch("/api/profile", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          age: parseInt(formData.age),
+          age: isNaN(parsedAge) ? formData.age : parsedAge,
           country: formData.country,
           educationLevel: formData.education,
           reasonStopped: formData.reasonStopped,
@@ -65,14 +72,18 @@ export default function Onboarding() {
       });
 
       if (!response.ok) {
-        throw new Error("Failed to save profile");
+        // Surface the real validation error from the API
+        const errorData = await response.json().catch(() => ({}));
+        const details = errorData.details?.map((d: any) => `${d.path?.join('.')}: ${d.message}`).join(", ");
+        const message = details ? `Validation error: ${details}` : (errorData.error || "Failed to save profile");
+        throw new Error(message);
       }
 
       // Success! Redirect to dashboard
       router.push("/dashboard");
     } catch (error) {
       console.error("Error saving profile:", error);
-      alert("Failed to save your profile. Please try again.");
+      alert(error instanceof Error ? error.message : "Failed to save your profile. Please try again.");
     } finally {
       setIsSubmitting(false);
     }
@@ -85,6 +96,28 @@ export default function Onboarding() {
   };
 
   const handleNext = () => {
+    // Validate required fields for the current step
+    let isValid = true;
+    switch (currentStep) {
+      case 0:
+        if (!formData.age || !formData.country || !formData.education) isValid = false;
+        break;
+      case 1:
+        if (!formData.reasonStopped) isValid = false;
+        break;
+      case 2:
+        if (!formData.skills || !formData.interests) isValid = false;
+        break;
+      case 3:
+        if (!formData.hoursPerDay || !formData.internetAvailability) isValid = false;
+        break;
+    }
+
+    if (!isValid) {
+      alert("Please fill in all required fields to continue.");
+      return;
+    }
+
     if (currentStep < totalSteps - 1) {
       setCurrentStep(currentStep + 1);
     }

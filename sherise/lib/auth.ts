@@ -47,8 +47,9 @@ export async function getAuthenticatedUser() {
       createdAt: dbUser.createdAt,
     }
   } catch (error) {
+    const message = error instanceof Error ? error.message : String(error)
     console.error('Error getting/creating user in database:', error)
-    throw new Error('Failed to authenticate user')
+    throw new Error(`Failed to authenticate user: ${message}`)
   }
 }
 

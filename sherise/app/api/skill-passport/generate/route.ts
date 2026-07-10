@@ -2,9 +2,9 @@ import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import { prisma } from '@/lib/prisma';
+import { requireAuth } from '@/lib/auth';
 
 const generateSkillPassportSchema = z.object({
-  userId: z.string(),
   selectedRoles: z.array(z.string()),
 });
 
@@ -50,18 +50,19 @@ function getFallbackContent(skills: string[], careerGoal: string) {
 
 export async function POST(request: NextRequest) {
   try {
+    const user = await requireAuth();
+    
     const body = await request.json();
-    const { userId, selectedRoles } = generateSkillPassportSchema.parse(body);
+    const { selectedRoles } = generateSkillPassportSchema.parse(body);
 
     // Fetch user profile for career goal
-    const user = await prisma.user.findUnique({
-      where: { id: userId },
-      include: { profile: true },
+    const profile = await prisma.profile.findUnique({
+      where: { userId: user.id },
     });
 
-    if (!user || !user.profile) {
+    if (!profile) {
       return NextResponse.json(
-        { success: false, error: 'User or profile not found' },
+        { success: false, error: 'Profile not found. Please complete onboarding.' },
         { status: 404 }
       );
     }
@@ -88,7 +89,7 @@ export async function POST(request: NextRequest) {
     }
 
     const skillNames = mappedSkills.map(s => s.mappedSkill);
-    const careerGoal = user.profile.careerGoal;
+    const careerGoal = profile.careerGoal;
 
     // Generate professional content using AI
     let generatedContent;
@@ -128,11 +129,11 @@ Make each piece specific to HER skills and goal — no generic filler.`;
     }
 
     // Save skill entries to database
-    await prisma.skillPassportEntry.deleteMany({ where: { userId } });
+    await prisma.skillPassportEntry.deleteMany({ where: { userId: user.id } });
     
     await prisma.skillPassportEntry.createMany({
       data: mappedSkills.map(skill => ({
-        userId,
+        userId: user.id,
         lifeRole: skill.lifeRole,
         mappedSkill: skill.mappedSkill,
         justification: skill.justification,
@@ -141,9 +142,9 @@ Make each piece specific to HER skills and goal — no generic filler.`;
 
     // Save generated content
     const savedContent = await prisma.generatedContent.upsert({
-      where: { userId },
+      where: { userId: user.id },
       create: {
-        userId,
+        userId: user.id,
         resumeSummary: generatedContent.resumeSummary,
         bio: generatedContent.bio,
         elevatorPitch: generatedContent.pitch || generatedContent.elevatorPitch,

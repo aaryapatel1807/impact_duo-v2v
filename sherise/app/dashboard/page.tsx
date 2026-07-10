@@ -112,22 +112,22 @@ export default function Dashboard() {
       }
 
       // Fetch progress data
-      const progressRes = await fetch(`/api/progress/${clerkUser!.id}`);
+      const progressRes = await fetch("/api/progress");
       const progressData = progressRes.ok ? await progressRes.json() : null;
 
       // Fetch roadmap
-      const roadmapRes = await fetch(`/api/roadmap/${clerkUser!.id}`);
+      const roadmapRes = await fetch("/api/roadmap");
       const roadmapData = roadmapRes.ok ? await roadmapRes.json() : null;
 
       // Fetch skill passport
-      const skillPassportRes = await fetch(`/api/skill-passport/${clerkUser!.id}`);
+      const skillPassportRes = await fetch("/api/skill-passport");
       const skillPassportData = skillPassportRes.ok ? await skillPassportRes.json() : null;
 
       // Fetch matched opportunities
       const opportunitiesRes = await fetch("/api/opportunities/match", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ userId: clerkUser!.id }),
+        body: JSON.stringify({}),
       });
       const opportunitiesData = opportunitiesRes.ok ? await opportunitiesRes.json() : null;
 
