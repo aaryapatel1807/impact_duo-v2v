@@ -13,8 +13,8 @@
   "dependencies": {
     "@clerk/clerk-sdk-node": "^5.0.0",
     "@google/generative-ai": "^0.21.0",
-    "@prisma/adapter-pg": "^6.2.0",
-    "@prisma/client": "^6.2.0",
+    "@prisma/adapter-pg": "6.19.3",
+    "@prisma/client": "6.19.3",
     "@types/cors": "^2.8.17",
     "@types/express": "^5.0.0",
     "@types/node": "^22.10.2",
@@ -23,7 +23,7 @@
     "dotenv": "^16.4.7",
     "express": "^4.21.2",
     "pg": "^8.13.1",
-    "prisma": "^6.2.0",
+    "prisma": "6.19.3",
     "svix": "^1.40.0",
     "typescript": "^5.7.2",
     "zod": "^3.24.1"
