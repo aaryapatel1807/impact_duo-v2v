@@ -106,7 +106,7 @@ router.post('/', requireAuth, async (req: AuthRequest, res) => {
 // GET /api/profile/:userId - Get specific user profile
 router.get('/:userId', requireAuth, async (req: AuthRequest, res) => {
   try {
-    const { userId } = req.params;
+    const userId = Array.isArray(req.params.userId) ? req.params.userId[0] : req.params.userId;
 
     const user = await prisma.user.findUnique({
       where: { id: userId },

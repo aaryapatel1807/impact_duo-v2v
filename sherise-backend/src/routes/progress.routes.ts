@@ -244,7 +244,7 @@ router.get('/', requireAuth, async (req: AuthRequest, res) => {
 // GET /api/progress/:userId
 router.get('/:userId', requireAuth, async (req: AuthRequest, res) => {
   try {
-    const { userId } = req.params;
+    const userId = Array.isArray(req.params.userId) ? req.params.userId[0] : req.params.userId;
 
     const progressLogs = await prisma.progressLog.findMany({
       where: { userId },
@@ -269,7 +269,7 @@ router.get('/:userId', requireAuth, async (req: AuthRequest, res) => {
 // POST /api/progress/update
 router.post('/update', requireAuth, async (req: AuthRequest, res) => {
   try {
-    const { tasksCompleted, confidenceScore, currentStepIndex, notes } = req.body;
+    const { tasksCompleted, confidenceScore, currentStepIndex } = req.body;
 
     // Create new progress log
     const progressLog = await prisma.progressLog.create({
@@ -279,7 +279,6 @@ router.post('/update', requireAuth, async (req: AuthRequest, res) => {
         tasksCompleted: tasksCompleted || 0,
         confidenceScore: confidenceScore || 5,
         currentStepIndex: currentStepIndex || 0,
-        notes: notes || '',
         streakCount: 0 // Will be calculated on frontend
       }
     });
