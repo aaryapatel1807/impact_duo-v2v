@@ -111,21 +111,96 @@ export default function SkillPassport() {
     }
   };
 
-  const handleGenerate = () => {
-    const allSkillNames = selectedRoles.flatMap(
-      (roleId) => lifeRoles.find((r) => r.id === roleId)?.skills.map((s) => s.name) || []
-    );
-    const content = generateMockContent(allSkillNames);
-    setGeneratedContent(content);
-    setShowContent(true);
-    
-    // Scroll to generated content after a short delay
-    setTimeout(() => {
-      const generatedSection = document.getElementById('generated-content');
-      if (generatedSection) {
-        generatedSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  const handleGenerate = async () => {
+    try {
+      // Get userId from localStorage
+      let userId = localStorage.getItem("userId");
+      if (!userId) {
+        // If no userId, create user profile first
+        const userData = localStorage.getItem("userData");
+        if (!userData) {
+          router.push("/onboarding");
+          return;
+        }
+
+        const parsed = JSON.parse(userData);
+        const profileResponse = await fetch("/api/profile", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            name: parsed.name || "User",
+            email: parsed.email || `user-${Date.now()}@sherise.app`,
+            age: parseInt(parsed.age),
+            country: parsed.country,
+            educationLevel: parsed.education,
+            reasonStopped: parsed.reasonStopped,
+            skills: parsed.skills,
+            interests: parsed.interests,
+            hoursPerDay: parsed.hoursPerDay,
+            internetAvailability: parsed.internetAvailability,
+            careerGoal: parsed.careerGoal,
+          }),
+        });
+        
+        if (!profileResponse.ok) {
+          throw new Error("Failed to create profile");
+        }
+        
+        const profileData = await profileResponse.json();
+        userId = profileData.user.id;
+        localStorage.setItem("userId", userId);
       }
-    }, 100);
+
+      // Generate skill passport using real API
+      const response = await fetch("/api/skill-passport/generate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          userId,
+          selectedRoles: selectedRoles,
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error("Failed to generate skill passport");
+      }
+
+      const data = await response.json();
+      
+      if (data.success && data.generatedContent) {
+        setGeneratedContent({
+          resume: data.generatedContent.resumeSummary,
+          bio: data.generatedContent.bio,
+          pitch: data.generatedContent.elevatorPitch,
+        });
+        setShowContent(true);
+        
+        // Scroll to generated content after a short delay
+        setTimeout(() => {
+          const generatedSection = document.getElementById('generated-content');
+          if (generatedSection) {
+            generatedSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
+          }
+        }, 100);
+      } else {
+        // Fallback to mock content
+        const allSkillNames = selectedRoles.flatMap(
+          (roleId) => lifeRoles.find((r) => r.id === roleId)?.skills.map((s) => s.name) || []
+        );
+        const mockContent = generateMockContent(allSkillNames);
+        setGeneratedContent(mockContent);
+        setShowContent(true);
+      }
+    } catch (error) {
+      console.error("Error generating skill passport:", error);
+      // Fallback to mock content
+      const allSkillNames = selectedRoles.flatMap(
+        (roleId) => lifeRoles.find((r) => r.id === roleId)?.skills.map((s) => s.name) || []
+      );
+      const mockContent = generateMockContent(allSkillNames);
+      setGeneratedContent(mockContent);
+      setShowContent(true);
+    }
   };
 
   const copyToClipboard = (text: string) => {

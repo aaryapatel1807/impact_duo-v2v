@@ -97,19 +97,99 @@ export default function Roadmap() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // Simulate loading and API call
-    const userData = localStorage.getItem("userData");
-    if (!userData) {
-      router.push("/onboarding");
-      return;
-    }
+    const generateRoadmap = async () => {
+      const userData = localStorage.getItem("userData");
+      if (!userData) {
+        router.push("/onboarding");
+        return;
+      }
 
-    setTimeout(() => {
-      const parsed = JSON.parse(userData);
-      const mockData = generateMockRoadmap(parsed);
-      setRoadmapData(mockData);
-      setLoading(false);
-    }, 1500);
+      try {
+        const parsed = JSON.parse(userData);
+        
+        // Get or create user profile first
+        let userId = localStorage.getItem("userId");
+        if (!userId) {
+          // Create user profile
+          const profileResponse = await fetch("/api/profile", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              name: parsed.name || "User",
+              email: parsed.email || `user-${Date.now()}@sherise.app`,
+              age: parseInt(parsed.age),
+              country: parsed.country,
+              educationLevel: parsed.education,
+              reasonStopped: parsed.reasonStopped,
+              skills: parsed.skills,
+              interests: parsed.interests,
+              hoursPerDay: parsed.hoursPerDay,
+              internetAvailability: parsed.internetAvailability,
+              careerGoal: parsed.careerGoal,
+            }),
+          });
+          
+          if (!profileResponse.ok) {
+            throw new Error("Failed to create profile");
+          }
+          
+          const profileData = await profileResponse.json();
+          userId = profileData.user.id;
+          localStorage.setItem("userId", userId);
+        }
+
+        // Check if roadmap already exists
+        const existingRoadmapResponse = await fetch(`/api/roadmap/${userId}`);
+        if (existingRoadmapResponse.ok) {
+          const existingData = await existingRoadmapResponse.json();
+          if (existingData.success && existingData.roadmap) {
+            // Use existing roadmap
+            setRoadmapData({
+              currentSituation: existingData.roadmap.currentSituation,
+              steps: existingData.roadmap.steps,
+              estimatedTimeline: existingData.roadmap.timelineMonths,
+            });
+            setLoading(false);
+            return;
+          }
+        }
+
+        // Generate new roadmap using AI
+        const roadmapResponse = await fetch("/api/roadmap/generate", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ userId }),
+        });
+
+        if (!roadmapResponse.ok) {
+          throw new Error("Failed to generate roadmap");
+        }
+
+        const roadmapData = await roadmapResponse.json();
+        
+        if (roadmapData.success && roadmapData.roadmap) {
+          setRoadmapData({
+            currentSituation: roadmapData.roadmap.currentSituation,
+            steps: roadmapData.roadmap.steps,
+            estimatedTimeline: roadmapData.roadmap.timelineMonths,
+          });
+        } else {
+          // Fallback to mock data
+          const mockData = generateMockRoadmap(parsed);
+          setRoadmapData(mockData);
+        }
+      } catch (error) {
+        console.error("Error generating roadmap:", error);
+        // Fallback to mock data
+        const parsed = JSON.parse(userData);
+        const mockData = generateMockRoadmap(parsed);
+        setRoadmapData(mockData);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    generateRoadmap();
   }, [router]);
 
   if (loading || !roadmapData) {

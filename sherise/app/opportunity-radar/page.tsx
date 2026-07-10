@@ -183,86 +183,190 @@ export default function OpportunityRadar() {
   }>({ eligible: [], almost: [], future: [] });
 
   useEffect(() => {
-    const userData = localStorage.getItem("userData");
-    if (!userData) {
-      router.push("/onboarding");
-      return;
-    }
+    const matchOpportunities = async () => {
+      const userData = localStorage.getItem("userData");
+      if (!userData) {
+        router.push("/onboarding");
+        return;
+      }
 
-    const user = JSON.parse(userData);
-    const userAge = parseInt(user.age);
-    const userEducation = user.education;
-    const userCountry = user.country;
-    const userSkills = user.skills.toLowerCase();
+      try {
+        // Get userId from localStorage  
+        let userId = localStorage.getItem("userId");
+        if (!userId) {
+          // Create user profile first
+          const parsed = JSON.parse(userData);
+          const profileResponse = await fetch("/api/profile", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              name: parsed.name || "User",
+              email: parsed.email || `user-${Date.now()}@sherise.app`,
+              age: parseInt(parsed.age),
+              country: parsed.country,
+              educationLevel: parsed.education,
+              reasonStopped: parsed.reasonStopped,
+              skills: parsed.skills,
+              interests: parsed.interests,
+              hoursPerDay: parsed.hoursPerDay,
+              internetAvailability: parsed.internetAvailability,
+              careerGoal: parsed.careerGoal,
+            }),
+          });
+          
+          if (!profileResponse.ok) {
+            throw new Error("Failed to create profile");
+          }
+          
+          const profileData = await profileResponse.json();
+          userId = profileData.user.id;
+          localStorage.setItem("userId", userId);
+        }
 
-    const matched = opportunities.map((opp) => {
-      const missing: string[] = [];
-      let matches = 0;
-      let total = 0;
+        // Use real opportunity matching API
+        const matchResponse = await fetch("/api/opportunities/match", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ userId }),
+        });
 
-      // Check age
-      if (opp.eligibility.ageMin || opp.eligibility.ageMax) {
+        if (!matchResponse.ok) {
+          throw new Error("Failed to match opportunities");
+        }
+
+        const matchData = await matchResponse.json();
+        
+        if (matchData.success && matchData.matches) {
+          // Convert API response to expected format
+          setMatchedOpportunities({
+            eligible: matchData.matches.eligible.map((opp: any) => ({
+              ...opp,
+              id: opp.id,
+              eligibility: {
+                ageMin: opp.minAge,
+                ageMax: opp.maxAge,
+                education: opp.minEducation,
+                region: opp.region,
+                skills: opp.tags,
+              },
+              link: opp.url,
+            })),
+            almost: matchData.matches.almost.map((opp: any) => ({
+              ...opp,
+              id: opp.id,
+              eligibility: {
+                ageMin: opp.minAge,
+                ageMax: opp.maxAge,
+                education: opp.minEducation,
+                region: opp.region,
+                skills: opp.tags,
+              },
+              link: opp.url,
+            })),
+            future: matchData.matches.future.map((opp: any) => ({
+              ...opp,
+              id: opp.id,
+              eligibility: {
+                ageMin: opp.minAge,
+                ageMax: opp.maxAge,
+                education: opp.minEducation,
+                region: opp.region,
+                skills: opp.tags,
+              },
+              link: opp.url,
+            })),
+          });
+        } else {
+          // Fallback to mock matching logic
+          fallbackToMockMatching(JSON.parse(userData));
+        }
+      } catch (error) {
+        console.error("Error matching opportunities:", error);
+        // Fallback to mock matching logic
+        const userData = localStorage.getItem("userData");
+        if (userData) {
+          fallbackToMockMatching(JSON.parse(userData));
+        }
+      }
+    };
+
+    const fallbackToMockMatching = (user: any) => {
+      const userAge = parseInt(user.age);
+      const userEducation = user.education;
+      const userCountry = user.country;
+      const userSkills = user.skills.toLowerCase();
+
+      const matched = opportunities.map((opp) => {
+        const missing: string[] = [];
+        let matches = 0;
+        let total = 0;
+
+        // Check age
+        if (opp.eligibility.ageMin || opp.eligibility.ageMax) {
+          total++;
+          if (
+            (!opp.eligibility.ageMin || userAge >= opp.eligibility.ageMin) &&
+            (!opp.eligibility.ageMax || userAge <= opp.eligibility.ageMax)
+          ) {
+            matches++;
+          } else {
+            missing.push("Age requirement");
+          }
+        }
+
+        // Check education
+        total++;
+        if (opp.eligibility.education.includes(userEducation)) {
+          matches++;
+        } else {
+          missing.push("Education level");
+        }
+
+        // Check region
         total++;
         if (
-          (!opp.eligibility.ageMin || userAge >= opp.eligibility.ageMin) &&
-          (!opp.eligibility.ageMax || userAge <= opp.eligibility.ageMax)
+          opp.eligibility.region.includes(userCountry) ||
+          opp.eligibility.region.includes("Global")
         ) {
           matches++;
         } else {
-          missing.push("Age requirement");
+          missing.push("Location");
         }
-      }
 
-      // Check education
-      total++;
-      if (opp.eligibility.education.includes(userEducation)) {
-        matches++;
-      } else {
-        missing.push("Education level");
-      }
+        // Check skills (optional)
+        if (opp.eligibility.skills) {
+          total++;
+          const hasSkill = opp.eligibility.skills.some((skill) =>
+            userSkills.includes(skill.toLowerCase().substring(0, 15))
+          );
+          if (hasSkill) {
+            matches++;
+          } else {
+            missing.push("Specific skill");
+          }
+        }
 
-      // Check region
-      total++;
-      if (
-        opp.eligibility.region.includes(userCountry) ||
-        opp.eligibility.region.includes("Global")
-      ) {
-        matches++;
-      } else {
-        missing.push("Location");
-      }
-
-      // Check skills (optional)
-      if (opp.eligibility.skills) {
-        total++;
-        const hasSkill = opp.eligibility.skills.some((skill) =>
-          userSkills.includes(skill.toLowerCase().substring(0, 15))
-        );
-        if (hasSkill) {
-          matches++;
+        // Determine match status
+        let matchStatus: MatchStatus;
+        if (matches === total) {
+          matchStatus = "eligible";
+        } else if (matches >= total - 1) {
+          matchStatus = "almost";
         } else {
-          missing.push("Specific skill");
+          matchStatus = "future";
         }
-      }
 
-      // Determine match status
-      let matchStatus: MatchStatus;
-      if (matches === total) {
-        matchStatus = "eligible";
-      } else if (matches >= total - 1) {
-        matchStatus = "almost";
-      } else {
-        matchStatus = "future";
-      }
+        return { ...opp, matchStatus, missingCriteria: missing };
+      });
 
-      return { ...opp, matchStatus, missingCriteria: missing };
-    });
+      setMatchedOpportunities({
+        eligible: matched.filter((m) => m.matchStatus === "eligible"),
+        almost: matched.filter((m) => m.matchStatus === "almost"),
+        future: matched.filter((m) => m.matchStatus === "future"),
+      });
+    };
 
-    setMatchedOpportunities({
-      eligible: matched.filter((m) => m.matchStatus === "eligible"),
-      almost: matched.filter((m) => m.matchStatus === "almost"),
-      future: matched.filter((m) => m.matchStatus === "future"),
-    });
+    matchOpportunities();
   }, [router]);
 
   const OpportunityCard = ({ opp }: { opp: MatchedOpportunity }) => (
