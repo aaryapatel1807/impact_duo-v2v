@@ -1,7 +1,12 @@
+/* Tailwind CSS directives - these are required for Tailwind to work */
+/* stylelint-disable-next-line at-rule-no-unknown */
 @tailwind base;
-@tailwind components;
+/* stylelint-disable-next-line at-rule-no-unknown */
+@tailwind components; 
+/* stylelint-disable-next-line at-rule-no-unknown */
 @tailwind utilities;
 
+/* CSS Variables */
 :root {
   --background: #FCFBFF;
   --foreground: #1F2937;
@@ -10,14 +15,18 @@
   --premium-gold: #F59E0B;
 }
 
+/* Base styles */
 @layer base {
   * {
-    @apply m-0 p-0 box-border;
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
   }
 
   html,
   body {
-    @apply max-w-full overflow-x-hidden;
+    max-width: 100vw;
+    overflow-x: hidden;
     font-family: 'Inter', system-ui, -apple-system, sans-serif;
     background: var(--background);
     color: var(--foreground);
@@ -27,7 +36,8 @@
   }
 
   a {
-    @apply text-inherit no-underline;
+    color: inherit;
+    text-decoration: none;
   }
 
   /* Premium selection styles */
@@ -42,24 +52,29 @@
   }
 }
 
+/* Component styles */
 @layer components {
   /* Legacy claymorphism classes (keep for compatibility) */
   .clay-card {
-    @apply bg-white rounded-3xl;
     background: rgba(255, 255, 255, 0.7);
     backdrop-filter: blur(20px);
     border: 1px solid rgba(255, 255, 255, 0.3);
+    border-radius: 1.5rem;
     box-shadow: 
       0 8px 32px rgba(31, 38, 135, 0.37),
       inset 0 1px 0 rgba(255, 255, 255, 0.5);
   }
   
   .clay-button {
-    @apply rounded-2xl text-white cursor-pointer border-0 font-semibold;
     background: linear-gradient(145deg, #a855f7, #8b5cf6);
     box-shadow: 
       6px 6px 12px rgba(168, 85, 247, 0.3), 
       -6px -6px 12px rgba(196, 125, 249, 0.3);
+    border-radius: 1rem;
+    border: none;
+    color: white;
+    cursor: pointer;
+    font-weight: 600;
     transition: all 0.3s ease;
   }
   
@@ -71,10 +86,10 @@
   }
   
   .clay-stone {
-    @apply bg-white rounded-2xl;
     background: rgba(255, 255, 255, 0.8);
     backdrop-filter: blur(10px);
     border: 1px solid rgba(255, 255, 255, 0.2);
+    border-radius: 1rem;
     box-shadow: 
       6px 6px 16px rgba(31, 38, 135, 0.2),
       -4px -4px 12px rgba(255, 255, 255, 0.8);
@@ -175,6 +190,7 @@
   }
 }
 
+/* Utility styles */
 @layer utilities {
   /* Smooth transitions for all elements */
   * {
