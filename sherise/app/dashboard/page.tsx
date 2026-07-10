@@ -89,14 +89,8 @@ export default function Dashboard() {
       return;
     }
 
+    // Load data only once on mount
     loadDashboardData();
-    
-    // Refresh data every 5 seconds to pick up changes
-    const interval = setInterval(() => {
-      loadDashboardData();
-    }, 5000);
-    
-    return () => clearInterval(interval);
   }, [isLoaded, clerkUser, router]);
 
   const loadDashboardData = async () => {

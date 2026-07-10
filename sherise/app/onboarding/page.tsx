@@ -61,7 +61,8 @@ export default function Onboarding() {
 
       const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
 
-      // Save profile to backend using authenticated user
+      // Step 1: Save profile to backend using authenticated user
+      console.log('Saving profile...');
       const parsedAge = parseInt(formData.age, 10);
       const response = await fetch(`${apiUrl}/api/profile`, {
         method: "POST",
@@ -90,10 +91,32 @@ export default function Onboarding() {
         throw new Error(message);
       }
 
+      console.log('Profile saved successfully');
+
+      // Step 2: Generate AI Roadmap
+      console.log('Generating AI roadmap...');
+      const roadmapResponse = await fetch(`${apiUrl}/api/roadmap/generate`, {
+        method: "POST",
+        headers: { 
+          'Authorization': `Bearer ${token}`,
+          "Content-Type": "application/json" 
+        },
+      });
+
+      if (!roadmapResponse.ok) {
+        const errorData = await roadmapResponse.json().catch(() => ({}));
+        console.error('Roadmap generation failed:', errorData);
+        // Don't fail onboarding if roadmap generation fails
+        // User can generate it later from dashboard
+      } else {
+        const roadmapData = await roadmapResponse.json();
+        console.log('Roadmap generated successfully:', roadmapData.source);
+      }
+
       // Success! Redirect to dashboard
       router.push("/dashboard");
     } catch (error) {
-      console.error("Error saving profile:", error);
+      console.error("Error during onboarding:", error);
       alert(error instanceof Error ? error.message : "Failed to save your profile. Please try again.");
     } finally {
       setIsSubmitting(false);

@@ -23,10 +23,20 @@ export default function Sidebar({ user }: { user?: { name: string; level: number
 
   const handleNavigation = (itemId: string) => {
     setActiveItem(itemId);
-    if (itemId === "roadmap") router.push("/roadmap");
-    if (itemId === "skill-passport") router.push("/skill-passport");
-    if (itemId === "opportunity-radar") router.push("/opportunity-radar");
-    if (itemId === "dream-tracker") router.push("/dream-tracker");
+    // Handle all navigation routes
+    const routes: Record<string, string> = {
+      dashboard: "/dashboard",
+      roadmap: "/roadmap",
+      "skill-passport": "/skill-passport",
+      "opportunity-radar": "/opportunity-radar",
+      "dream-tracker": "/dream-tracker",
+      achievements: "/achievements",
+      settings: "/settings",
+    };
+    
+    if (routes[itemId]) {
+      router.push(routes[itemId]);
+    }
   };
 
   return (
