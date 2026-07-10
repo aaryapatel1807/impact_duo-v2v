@@ -5,9 +5,10 @@ import { useEffect, useState } from "react";
 
 interface PhoenixOrbProps {
   progress: number; // 0-100
+  onClick?: () => void;
 }
 
-export function PhoenixOrb({ progress }: PhoenixOrbProps) {
+export function PhoenixOrb({ progress, onClick }: PhoenixOrbProps) {
   const [stage, setStage] = useState(0);
   const [showCelebration, setShowCelebration] = useState(false);
 
@@ -83,10 +84,10 @@ export function PhoenixOrb({ progress }: PhoenixOrbProps) {
   const phoenixState = getPhoenixState();
 
   return (
-    <div className="fixed bottom-8 right-8 z-40 pointer-events-none">
+    <div className="fixed bottom-8 right-8 z-40">
       {/* Main Phoenix Orb */}
       <motion.div
-        className="relative"
+        className="relative pointer-events-auto"
         animate={{
           y: [0, -10, 0],
         }}
@@ -132,6 +133,7 @@ export function PhoenixOrb({ progress }: PhoenixOrbProps) {
             rotate: 5,
           }}
           whileTap={{ scale: 0.95 }}
+          onClick={onClick}
           animate={stage === 4 ? {
             rotate: [0, 360],
             scale: [1, 1.1, 1],

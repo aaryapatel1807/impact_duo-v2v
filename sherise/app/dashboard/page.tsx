@@ -78,6 +78,7 @@ export default function Dashboard() {
   const [dashboardData, setDashboardData] = useState<DashboardData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [showPhoenixMenu, setShowPhoenixMenu] = useState(false);
 
   useEffect(() => {
     if (!isLoaded) return;
@@ -330,7 +331,59 @@ export default function Dashboard() {
         </div>
       </div>
 
-      <PhoenixOrb progress={phoenixProgress} />
+      <PhoenixOrb 
+        progress={phoenixProgress} 
+        onClick={() => setShowPhoenixMenu(!showPhoenixMenu)}
+      />
+
+      {/* Phoenix Menu */}
+      {showPhoenixMenu && (
+        <motion.div
+          className="fixed bottom-40 right-8 z-50 bg-white/95 backdrop-blur-xl border border-purple-200 rounded-2xl shadow-2xl p-4 min-w-48"
+          initial={{ opacity: 0, y: 10, scale: 0.95 }}
+          animate={{ opacity: 1, y: 0, scale: 1 }}
+          exit={{ opacity: 0, y: 10, scale: 0.95 }}
+        >
+          <div className="space-y-2">
+            <button
+              onClick={() => {
+                router.push("/roadmap");
+                setShowPhoenixMenu(false);
+              }}
+              className="w-full text-left px-4 py-2 rounded-lg hover:bg-purple-100 transition-all text-sm font-medium"
+            >
+              📊 View Roadmap
+            </button>
+            <button
+              onClick={() => {
+                router.push("/skill-passport");
+                setShowPhoenixMenu(false);
+              }}
+              className="w-full text-left px-4 py-2 rounded-lg hover:bg-purple-100 transition-all text-sm font-medium"
+            >
+              📋 Skill Passport
+            </button>
+            <button
+              onClick={() => {
+                router.push("/opportunity-radar");
+                setShowPhoenixMenu(false);
+              }}
+              className="w-full text-left px-4 py-2 rounded-lg hover:bg-purple-100 transition-all text-sm font-medium"
+            >
+              🎯 Opportunities
+            </button>
+            <button
+              onClick={() => {
+                router.push("/dream-tracker");
+                setShowPhoenixMenu(false);
+              }}
+              className="w-full text-left px-4 py-2 rounded-lg hover:bg-purple-100 transition-all text-sm font-medium"
+            >
+              💭 Dream Tracker
+            </button>
+          </div>
+        </motion.div>
+      )}
     </div>
   );
 }
