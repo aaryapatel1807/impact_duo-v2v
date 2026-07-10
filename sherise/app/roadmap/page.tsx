@@ -3,6 +3,12 @@
 import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import { useRouter } from "next/navigation";
+import {
+  ensureUserProfile,
+  getStoredUserId,
+  isOnboardingComplete,
+  type OnboardingStorage,
+} from "@/lib/profile-client";
 
 interface RoadmapStep {
   title: string;
@@ -104,39 +110,14 @@ export default function Roadmap() {
         return;
       }
 
+      const parsed = JSON.parse(userData) as OnboardingStorage;
+      if (!isOnboardingComplete(parsed)) {
+        router.push("/onboarding");
+        return;
+      }
+
       try {
-        const parsed = JSON.parse(userData);
-        
-        // Get or create user profile first
-        let userId = localStorage.getItem("userId");
-        if (!userId) {
-          // Create user profile
-          const profileResponse = await fetch("/api/profile", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              name: parsed.name || "User",
-              email: parsed.email || `user-${Date.now()}@sherise.app`,
-              age: parseInt(parsed.age),
-              country: parsed.country,
-              educationLevel: parsed.education,
-              reasonStopped: parsed.reasonStopped,
-              skills: parsed.skills,
-              interests: parsed.interests,
-              hoursPerDay: parsed.hoursPerDay,
-              internetAvailability: parsed.internetAvailability,
-              careerGoal: parsed.careerGoal,
-            }),
-          });
-          
-          if (!profileResponse.ok) {
-            throw new Error("Failed to create profile");
-          }
-          
-          const profileData = await profileResponse.json();
-          userId = profileData.user.id;
-          localStorage.setItem("userId", userId);
-        }
+        const userId = await ensureUserProfile(parsed);
 
         // Check if roadmap already exists
         const existingRoadmapResponse = await fetch(`/api/roadmap/${userId}`);

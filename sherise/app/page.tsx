@@ -76,18 +76,69 @@ export default function Home() {
             Your life experience — however non-linear or interrupted — is the foundation of your comeback. Let's turn it into a concrete, visualized path forward.
           </motion.p>
 
-          {/* CTA button */}
-          <motion.button
-            onClick={() => router.push("/onboarding")}
-            className="clay-button px-10 py-5 text-white font-body font-medium text-lg mb-20"
+          {/* CTA buttons */}
+          <motion.div
+            className="flex flex-col sm:flex-row items-center justify-center gap-4 mb-20"
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.8, delay: 0.6 }}
-            whileHover={{ scale: 1.02 }}
-            whileTap={{ scale: 0.98 }}
           >
-            Start your comeback
-          </motion.button>
+            <motion.button
+              onClick={() => router.push("/dashboard")}
+              className="clay-button px-8 py-4 text-white font-body font-medium text-lg bg-gradient-to-r from-purple-500 to-pink-500 shadow-xl"
+              whileHover={{ scale: 1.05, y: -2 }}
+              whileTap={{ scale: 0.98 }}
+            >
+              🎨 Premium Dashboard
+            </motion.button>
+            
+            <motion.button
+              onClick={() => router.push("/onboarding")}
+              className="clay-button px-10 py-4 text-white font-body font-medium text-lg"
+              whileHover={{ scale: 1.02 }}
+              whileTap={{ scale: 0.98 }}
+            >
+              Start your comeback
+            </motion.button>
+          </motion.div>
+
+          {/* Features preview cards */}
+          <motion.div
+            className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-16"
+            initial={{ y: 50, opacity: 0 }}
+            animate={{ y: 0, opacity: 1 }}
+            transition={{ delay: 0.7, duration: 0.8 }}
+          >
+            <motion.div
+              className="clay-card p-6 text-center cursor-pointer group"
+              whileHover={{ y: -5, scale: 1.02 }}
+              onClick={() => router.push("/dashboard")}
+            >
+              <div className="text-4xl mb-4 group-hover:scale-110 transition-transform">📊</div>
+              <h3 className="font-bold text-gray-800 mb-2">AI Dashboard</h3>
+              <p className="text-sm text-gray-600">Award-winning premium interface</p>
+            </motion.div>
+            
+            <motion.div
+              className="clay-card p-6 text-center cursor-pointer group"
+              whileHover={{ y: -5, scale: 1.02 }}
+              onClick={() => router.push("/roadmap")}
+            >
+              <div className="text-4xl mb-4 group-hover:scale-110 transition-transform">🗺️</div>
+              <h3 className="font-bold text-gray-800 mb-2">3D Roadmap</h3>
+              <p className="text-sm text-gray-600">Interactive stepping stone journey</p>
+            </motion.div>
+            
+            <motion.div
+              className="clay-card p-6 text-center cursor-pointer group"
+              whileHover={{ y: -5, scale: 1.02 }}
+              onClick={() => router.push("/skill-passport")}
+            >
+              <div className="text-4xl mb-4 group-hover:scale-110 transition-transform">📋</div>
+              <h3 className="font-bold text-gray-800 mb-2">Skill Passport</h3>
+              <p className="text-sm text-gray-600">AI-powered transformation</p>
+            </motion.div>
+          </motion.div>
 
           {/* Preview of the stepping-stone path */}
           <motion.div

@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { motion } from "framer-motion";
 import { useRouter } from "next/navigation";
+import { markOnboardingComplete } from "@/lib/profile-client";
 
 interface OnboardingData {
   age: string;
@@ -37,7 +38,9 @@ export default function Onboarding() {
     e.preventDefault();
     // Store in localStorage for demo purposes
     localStorage.setItem("userData", JSON.stringify(formData));
-    router.push("/roadmap");
+    // Mark onboarding as complete
+    markOnboardingComplete();
+    router.push("/dashboard");
   };
 
   const handleChange = (

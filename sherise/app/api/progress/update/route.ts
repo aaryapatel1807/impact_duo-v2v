@@ -44,7 +44,11 @@ function calculateStreakCount(previousLogs: any[], newLogDate: Date): number {
   }
 }
 
-function getMotivationalMessage(streakCount: number, stepIndex: number, completedAction?: string): string {
+function getMotivationalMessage(
+  streakCount: number,
+  stepIndex: number,
+  completedAction?: 'daily_task' | 'roadmap_step' | 'skill_practice' | 'opportunity_apply'
+): string {
   const messages = {
     daily_task: [
       "Great job completing your daily task! 🎯",

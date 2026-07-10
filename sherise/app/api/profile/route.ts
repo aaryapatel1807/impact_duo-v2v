@@ -6,7 +6,7 @@ const profileSchema = z.object({
   userId: z.string().optional(), // If not provided, we'll create a new user
   name: z.string().min(1),
   email: z.string().email(),
-  age: z.number().int().positive(),
+  age: z.coerce.number().int().positive(),
   country: z.string().min(1),
   educationLevel: z.string().min(1),
   reasonStopped: z.string().min(1),
@@ -87,6 +87,11 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({
       success: true,
       userId: result.id,
+      user: {
+        id: result.id,
+        name: result.name,
+        email: result.email,
+      },
       profile: result.profile,
     });
   } catch (error) {

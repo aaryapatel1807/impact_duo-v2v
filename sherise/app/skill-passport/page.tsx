@@ -3,6 +3,12 @@
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useRouter } from "next/navigation";
+import {
+  ensureUserProfile,
+  getStoredUserId,
+  isOnboardingComplete,
+  type OnboardingStorage,
+} from "@/lib/profile-client";
 
 interface LifeRole {
   id: string;
@@ -113,42 +119,21 @@ export default function SkillPassport() {
 
   const handleGenerate = async () => {
     try {
-      // Get userId from localStorage
-      let userId = localStorage.getItem("userId");
+      let userId = getStoredUserId();
       if (!userId) {
-        // If no userId, create user profile first
         const userData = localStorage.getItem("userData");
         if (!userData) {
           router.push("/onboarding");
           return;
         }
 
-        const parsed = JSON.parse(userData);
-        const profileResponse = await fetch("/api/profile", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            name: parsed.name || "User",
-            email: parsed.email || `user-${Date.now()}@sherise.app`,
-            age: parseInt(parsed.age),
-            country: parsed.country,
-            educationLevel: parsed.education,
-            reasonStopped: parsed.reasonStopped,
-            skills: parsed.skills,
-            interests: parsed.interests,
-            hoursPerDay: parsed.hoursPerDay,
-            internetAvailability: parsed.internetAvailability,
-            careerGoal: parsed.careerGoal,
-          }),
-        });
-        
-        if (!profileResponse.ok) {
-          throw new Error("Failed to create profile");
+        const parsed = JSON.parse(userData) as OnboardingStorage;
+        if (!isOnboardingComplete(parsed)) {
+          router.push("/onboarding");
+          return;
         }
-        
-        const profileData = await profileResponse.json();
-        userId = profileData.user.id;
-        localStorage.setItem("userId", userId);
+
+        userId = await ensureUserProfile(parsed);
       }
 
       // Generate skill passport using real API
