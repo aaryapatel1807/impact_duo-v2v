@@ -114,7 +114,7 @@ router.post('/generate', requireAuth, async (req: AuthRequest, res) => {
     }
 
     // Initialize Gemini AI
-    const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
+    const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
 
     // Create comprehensive prompt
     const prompt = `You are an AI career advisor specializing in helping women restart their careers after gaps.
