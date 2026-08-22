@@ -43,7 +43,7 @@ export default function Roadmap() {
       const token = await getToken();
       if (!token) throw new Error("Failed to get authentication token");
 
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'https://sherise-backend-aaryapatel1807-7680s-projects.vercel.app';
       const response = await fetch(`${apiUrl}/api/roadmap`, {
         method: 'GET',
         headers: { 'Authorization': `Bearer ${token}` },
@@ -72,7 +72,7 @@ export default function Roadmap() {
       const token = await getToken();
       if (!token) throw new Error("Failed to get authentication token");
 
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'https://sherise-backend-aaryapatel1807-7680s-projects.vercel.app';
       const response = await fetch(`${apiUrl}/api/roadmap/generate`, {
         method: "POST",
         headers: { 

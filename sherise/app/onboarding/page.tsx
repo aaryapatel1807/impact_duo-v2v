@@ -59,7 +59,7 @@ export default function Onboarding() {
         throw new Error("Failed to get authentication token");
       }
 
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'https://sherise-backend-aaryapatel1807-7680s-projects.vercel.app';
 
       // Step 1: Save profile to backend using authenticated user
       console.log('Saving profile...');

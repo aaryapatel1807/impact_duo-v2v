@@ -103,7 +103,7 @@ export default function Dashboard() {
         throw new Error("Failed to get authentication token");
       }
 
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'https://sherise-backend-aaryapatel1807-7680s-projects.vercel.app';
 
       // Fetch user profile from backend
       const profileRes = await fetch(`${apiUrl}/api/profile`, {

@@ -9,7 +9,7 @@ dotenv.config();
 const app = express();
 const PORT = process.env.PORT || 5000;
 
-const configuredFrontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
+const configuredFrontendUrl = process.env.FRONTEND_URL || 'https://sherise-frontend-aaryapatel1807-7680s-projects.vercel.app';
 const allowedOrigins = configuredFrontendUrl
   .split(',')
   .map((origin) => origin.trim())
