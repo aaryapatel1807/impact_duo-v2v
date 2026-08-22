@@ -6,7 +6,7 @@
 
 import { useAuth } from '@clerk/nextjs';
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'https://sherise-backend-aaryapatel1807-7680s-projects.vercel.app';
+const API_URL = process.env.NEXT_PUBLIC_API_URL || 'https://sherise-api.onrender.com';
 
 /**
  * Make authenticated API request to backend

@@ -13,6 +13,8 @@ export default clerkMiddleware(async (auth, request) => {
   if (!isPublicRoute(request)) {
     await auth.protect()
   }
+}, {
+  publishableKey: process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY || 'pk_test_cnVsaW5nLXByYXduLTg5LmNsZXJrLmFjY291bnRzLmRldiQ',
 })
 
 export const config = {

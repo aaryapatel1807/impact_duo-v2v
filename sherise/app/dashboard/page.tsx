@@ -103,7 +103,7 @@ export default function Dashboard() {
         throw new Error("Failed to get authentication token");
       }
 
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'https://sherise-backend-aaryapatel1807-7680s-projects.vercel.app';
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'https://sherise-api.onrender.com';
 
       // Fetch user profile from backend
       const profileRes = await fetch(`${apiUrl}/api/profile`, {

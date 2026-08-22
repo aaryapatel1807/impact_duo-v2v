@@ -45,7 +45,7 @@ export default function SkillPassport() {
       const token = await getToken();
       if (!token) throw new Error("Failed to get authentication token");
 
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'https://sherise-backend-aaryapatel1807-7680s-projects.vercel.app';
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'https://sherise-api.onrender.com';
       const response = await fetch(`${apiUrl}/api/skill-passport`, {
         method: 'GET',
         headers: { 'Authorization': `Bearer ${token}` },
@@ -81,7 +81,7 @@ export default function SkillPassport() {
       const token = await getToken();
       if (!token) throw new Error("Failed to get authentication token");
 
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'https://sherise-backend-aaryapatel1807-7680s-projects.vercel.app';
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'https://sherise-api.onrender.com';
       const response = await fetch(`${apiUrl}/api/skill-passport/generate`, {
         method: "POST",
         headers: { 
