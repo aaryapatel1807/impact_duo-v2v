@@ -2,21 +2,28 @@ import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
 
-// Load environment variables
+// Load environment variables for local development. Vercel injects production
+// variables into process.env before the function is initialized.
 dotenv.config();
 
 const app = express();
 const PORT = process.env.PORT || 5000;
 
+const configuredFrontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
+const allowedOrigins = configuredFrontendUrl
+  .split(',')
+  .map((origin) => origin.trim())
+  .filter(Boolean);
+
 // Middleware
 app.use(cors({
-  origin: process.env.FRONTEND_URL || 'http://localhost:3000',
-  credentials: true
+  origin: allowedOrigins.length === 1 ? allowedOrigins[0] : allowedOrigins,
+  credentials: true,
 }));
 app.use(express.json());
 
 // Health check
-app.get('/health', (req, res) => {
+app.get('/health', (_req, res) => {
   res.json({ status: 'ok', message: 'SheRise API is running' });
 });
 
@@ -37,16 +44,20 @@ app.use('/api/progress', progressRoutes);
 app.use('/api/webhooks', webhookRoutes);
 
 // Error handling middleware
-app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
+app.use((err: any, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
   console.error('Error:', err);
   res.status(err.status || 500).json({
     success: false,
-    error: err.message || 'Internal server error'
+    error: err.message || 'Internal server error',
   });
 });
 
-app.listen(PORT, () => {
-  console.log(`🚀 SheRise Backend API running on port ${PORT}`);
-});
+// Vercel imports the Express app as a serverless handler. Keep the listener
+// only for local development and traditional Node hosting.
+if (!process.env.VERCEL) {
+  app.listen(PORT, () => {
+    console.log(`SheRise Backend API running on port ${PORT}`);
+  });
+}
 
 export default app;
