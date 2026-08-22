@@ -3,6 +3,7 @@ import { Geist, Geist_Mono } from "next/font/google";
 import { ClerkProvider } from "@clerk/nextjs";
 import "./globals.css";
 
+// Deployment marker: rebuild after Production environment variables are updated.
 const clerkPublishableKey = process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY || 'pk_test_cnVsaW5nLXByYXduLTg5LmNsZXJrLmFjY291bnRzLmRldiQ';
 
 const geistSans = Geist({

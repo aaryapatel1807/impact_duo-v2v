@@ -52,6 +52,7 @@ app.use((err: any, _req: express.Request, res: express.Response, _next: express.
   });
 });
 
+// Deployment marker: rebuild after Production environment variables are updated.
 // Vercel imports the Express app as a serverless handler. Keep the listener
 // only for local development and traditional Node hosting.
 if (!process.env.VERCEL) {
