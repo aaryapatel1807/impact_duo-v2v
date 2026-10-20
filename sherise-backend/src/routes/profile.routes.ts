@@ -2,19 +2,23 @@ import { Router } from 'express';
 import { z } from 'zod';
 import { prisma } from '../lib/prisma';
 import { requireAuth, AuthRequest } from '../middleware/auth';
+import { normalizeEducationLevel } from '../lib/education';
 
 const router = Router();
 
 const profileSchema = z.object({
-  age: z.coerce.number().int().positive(),
-  country: z.string().min(1),
-  educationLevel: z.string().min(1),
-  reasonStopped: z.string().min(1),
-  skills: z.string().min(1),
-  interests: z.string().min(1),
-  hoursPerDay: z.string().min(1),
+  age: z.coerce.number().int().min(10).max(100),
+  country: z.string().min(1).max(100),
+  // Normalised to the canonical vocabulary the matcher understands, so an
+  // alternate spelling can never silently break education matching later.
+  educationLevel: z.string().min(1).max(100)
+    .transform((value) => normalizeEducationLevel(value) ?? value),
+  reasonStopped: z.string().min(1).max(500),
+  skills: z.string().min(1).max(2000),
+  interests: z.string().min(1).max(2000),
+  hoursPerDay: z.string().min(1).max(50),
   internetAvailability: z.enum(['none', 'low', 'stable']),
-  careerGoal: z.string().min(1),
+  careerGoal: z.string().min(1).max(1000),
 });
 
 // GET /api/profile - Get authenticated user's profile
@@ -39,7 +43,7 @@ router.get('/', requireAuth, async (req: AuthRequest, res) => {
     console.error('Error fetching profile:', error);
     return res.status(500).json({
       success: false,
-      error: error instanceof Error ? error.message : 'Failed to fetch profile',
+      error: 'Failed to fetch profile',
     });
   }
 });
@@ -98,15 +102,23 @@ router.post('/', requireAuth, async (req: AuthRequest, res) => {
     console.error('Error saving profile:', error);
     return res.status(500).json({
       success: false,
-      error: error instanceof Error ? error.message : 'Failed to save profile',
+      error: 'Failed to save profile',
     });
   }
 });
 
-// GET /api/profile/:userId - Get specific user profile
+// GET /api/profile/:userId - Get a user's profile (owner only: this returns
+// email, age and career-gap details, so it was an IDOR for any signed-in user)
 router.get('/:userId', requireAuth, async (req: AuthRequest, res) => {
   try {
     const userId = Array.isArray(req.params.userId) ? req.params.userId[0] : req.params.userId;
+
+    if (userId !== req.user!.id) {
+      return res.status(403).json({
+        success: false,
+        error: 'Forbidden - you can only access your own profile',
+      });
+    }
 
     const user = await prisma.user.findUnique({
       where: { id: userId },
@@ -135,7 +147,7 @@ router.get('/:userId', requireAuth, async (req: AuthRequest, res) => {
     console.error('Error fetching user profile:', error);
     return res.status(500).json({
       success: false,
-      error: error instanceof Error ? error.message : 'Failed to fetch user profile',
+      error: 'Failed to fetch user profile',
     });
   }
 });

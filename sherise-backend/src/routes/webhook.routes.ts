@@ -1,82 +1,101 @@
 import { Router, Request, Response } from 'express';
 import { Webhook } from 'svix';
-import { WebhookEvent } from '@clerk/clerk-sdk-node';
 import { prisma } from '../lib/prisma';
 
 const router = Router();
 
+// Minimal shape of the Clerk webhook events this handler consumes.
+interface ClerkWebhookEvent {
+  type: string;
+  data: {
+    id?: string;
+    email_addresses?: Array<{ email_address?: string }>;
+    first_name?: string | null;
+    last_name?: string | null;
+    image_url?: string | null;
+    username?: string | null;
+  };
+}
+
+function userFieldsFromEvent(data: ClerkWebhookEvent['data']) {
+  const email = data.email_addresses?.[0]?.email_address;
+  if (!email) {
+    // Never write '' into the @unique email column (it collides for a second
+    // email-less user). Throwing returns 500 so Clerk retries and the
+    // problem stays visible instead of silently corrupting the users table.
+    throw new Error(`Clerk webhook event for user ${data.id ?? '?'} carries no email address`);
+  }
+  return {
+    email,
+    name: `${data.first_name || ''} ${data.last_name || ''}`.trim() || 'User',
+    imageUrl: data.image_url || null,
+    username: data.username || null,
+  };
+}
+
 // POST /api/webhooks/clerk
+//
+// svix signs the EXACT raw request bytes, so this route must verify the raw
+// body. server.ts mounts express.raw() for /api/webhooks before the global
+// JSON parser, which makes req.body a Buffer here. (Previously the handler
+// verified JSON.stringify(req.body) — a re-serialisation that differs from
+// the raw bytes whenever the payload contains non-ASCII characters or
+// different spacing, so genuine Clerk deliveries were rejected with 400.)
 router.post('/clerk', async (req: Request, res: Response) => {
   try {
-    const payloadString = JSON.stringify(req.body);
-    const headersToSign = req.headers;
+    const webhookSecret = process.env.CLERK_WEBHOOK_SECRET;
+    if (!webhookSecret) {
+      console.error('CLERK_WEBHOOK_SECRET is not configured');
+      return res.status(500).json({ error: 'Webhook is not configured' });
+    }
 
-    const wh = new Webhook(process.env.CLERK_WEBHOOK_SECRET || '');
-    let evt: WebhookEvent;
+    const payloadString = Buffer.isBuffer(req.body)
+      ? req.body.toString('utf8')
+      : typeof req.body === 'string'
+        ? req.body
+        : JSON.stringify(req.body ?? {});
+
+    const wh = new Webhook(webhookSecret);
+    let evt: ClerkWebhookEvent;
 
     try {
-      evt = wh.verify(payloadString, headersToSign as Record<string, string>) as WebhookEvent;
+      evt = wh.verify(payloadString, req.headers as Record<string, string>) as ClerkWebhookEvent;
     } catch (err) {
       console.error('Error verifying webhook:', err);
       return res.status(400).json({ error: 'Webhook verification failed' });
     }
 
-    // Handle the webhook event
-    const eventType = evt.type;
-
-    if (eventType === 'user.created') {
-      const { id, email_addresses, first_name, last_name, image_url, username } = evt.data;
-
-      try {
-        await prisma.user.create({
-          data: {
-            id, // Use Clerk user ID
-            email: email_addresses?.[0]?.email_address || '',
-            name: `${first_name || ''} ${last_name || ''}`.trim() || 'User',
-            imageUrl: image_url || null,
-            username: username || null,
-          },
-        });
-
-        console.log(`User ${id} created in database`);
-      } catch (error) {
-        console.error('Error creating user in database:', error);
-        // User might already exist, that's okay
-      }
+    // Database errors are NOT caught per-event any more: they propagate to
+    // the outer catch and return 500, so Clerk retries the delivery instead
+    // of the sync being silently lost behind a 200.
+    if (evt.type === 'user.created' && evt.data.id) {
+      const fields = userFieldsFromEvent(evt.data);
+      await prisma.user.upsert({
+        where: { id: evt.data.id },
+        create: { id: evt.data.id, ...fields },
+        update: {}, // redelivery of user.created must not clobber anything
+      });
+      console.log(`User ${evt.data.id} created in database`);
     }
 
-    if (eventType === 'user.updated') {
-      const { id, email_addresses, first_name, last_name, image_url, username } = evt.data;
-
-      try {
-        await prisma.user.update({
-          where: { id },
-          data: {
-            email: email_addresses?.[0]?.email_address || '',
-            name: `${first_name || ''} ${last_name || ''}`.trim() || 'User',
-            imageUrl: image_url || null,
-            username: username || null,
-          },
-        });
-
-        console.log(`User ${id} updated in database`);
-      } catch (error) {
-        console.error('Error updating user in database:', error);
-      }
+    if (evt.type === 'user.updated' && evt.data.id) {
+      const fields = userFieldsFromEvent(evt.data);
+      // Upsert: an update for a user we never saw created must not no-op.
+      await prisma.user.upsert({
+        where: { id: evt.data.id },
+        create: { id: evt.data.id, ...fields },
+        update: fields,
+      });
+      console.log(`User ${evt.data.id} updated in database`);
     }
 
-    if (eventType === 'user.deleted') {
-      const { id } = evt.data;
-
-      try {
-        await prisma.user.delete({
-          where: { id: id! },
-        });
-
-        console.log(`User ${id} deleted from database`);
-      } catch (error) {
-        console.error('Error deleting user from database:', error);
-      }
+    if (evt.type === 'user.deleted' && evt.data.id) {
+      // deleteMany is idempotent — deleting an absent user is a success,
+      // not an error worth retrying forever.
+      await prisma.user.deleteMany({
+        where: { id: evt.data.id },
+      });
+      console.log(`User ${evt.data.id} deleted from database`);
     }
 
     return res.json({ success: true });
