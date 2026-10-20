@@ -25,10 +25,10 @@ npm install
 
 3. Set up environment variables:
 ```bash
-cp .env.example .env.local
+cp .env.example .env
 ```
 
-4. Update `.env.local` with your actual values:
+4. Update `.env` with your actual values:
 ```env
 DATABASE_URL=postgresql://user:password@host:5432/sherise
 CLERK_SECRET_KEY=your_clerk_secret_key
@@ -69,7 +69,11 @@ sherise-backend/
 │       └── prisma.ts            # Prisma client initialization
 ├── prisma/
 │   ├── schema.prisma            # Database schema
+│   ├── migrations/              # Prisma migrations
 │   └── seed.ts                  # Database seeding script
+├── api/
+│   └── index.ts                 # Vercel serverless entry point
+├── vercel.json                  # Vercel deployment config
 ├── package.json
 ├── tsconfig.json
 ├── .env.example
@@ -91,18 +95,16 @@ The `requireAuth` middleware verifies the token, syncs the user to the database,
 ### Profile Routes (`/api/profile`)
 - `GET /` - Get authenticated user's profile
 - `POST /` - Create/update user profile
-- `GET /:userId` - Get another user's profile (public)
+- `GET /:userId` - Get a user's profile (owner only — returns private data)
 
 ### Roadmap Routes (`/api/roadmap`)
 - `GET /` - Get user's career roadmap
 - `POST /` - Create/update roadmap
-- `GET /:userId` - Get another user's roadmap
 - `POST /generate` - Generate AI-powered roadmap
 
 ### Skill Passport Routes (`/api/skill-passport`)
 - `GET /` - Get user's skill passport entries
 - `POST /` - Save skill passport entries
-- `GET /:userId` - Get another user's skill passport
 - `POST /generate` - Generate skill passport from life roles
 
 ### Opportunities Routes (`/api/opportunities`)
@@ -111,7 +113,7 @@ The `requireAuth` middleware verifies the token, syncs the user to the database,
 
 ### Progress Routes (`/api/progress`)
 - `GET /` - Get comprehensive dashboard data (progress, analytics, insights)
-- `GET /:userId` - Get user's progress logs
+- `GET /:userId` - Get a user's progress logs (owner only)
 - `POST /update` - Create new progress log entry
 
 ### Webhook Routes (`/api/webhooks`)
@@ -125,7 +127,7 @@ The backend uses Prisma ORM with PostgreSQL. Key models:
 - **Profile** - User profile data (age, education, skills, interests, etc.)
 - **Roadmap** - Career roadmap with 5-step journey
 - **SkillPassportEntry** - Mapped life skills to professional skills
-- **GeneratedContent** - AI-generated content (resume, bio, pitch)
+- **GeneratedContent** - Generated content (resume, bio, pitch)
 - **Opportunity** - Job/scholarship opportunities
 - **OpportunityMatch** - Match results between user and opportunity
 - **ProgressLog** - Daily progress tracking (streak, confidence, tasks)
@@ -140,7 +142,7 @@ The backend uses Prisma ORM with PostgreSQL. Key models:
 ### Skill Passport Generation
 1. User selects life roles (homemaker, caregiver, cook, etc.)
 2. Backend maps roles to professional skills
-3. AI generates resume summary, bio, and elevator pitch
+3. Backend generates resume summary, bio, and elevator pitch from templates
 4. Data saved to database
 
 ### Opportunity Matching
@@ -157,7 +159,7 @@ The backend uses Prisma ORM with PostgreSQL. Key models:
 
 ## 🌱 Environment Configuration
 
-Create `.env.local` in the project root with:
+Create `.env` in the project root with:
 
 ```env
 # Required for production
@@ -181,13 +183,13 @@ npm run build      # Compile TypeScript
 npm start          # Start production server
 ```
 
-### Render Deployment
+### Vercel Deployment
 
 1. Push code to GitHub
-2. Create new Web Service on Render
-3. Connect GitHub repository
-4. Set environment variables in Render dashboard
-5. Render will auto-build and deploy on `main` branch pushes
+2. Import the repository in Vercel, with the project root set to `sherise-backend/`
+3. Set environment variables in the Vercel project settings (`DATABASE_URL`, `CLERK_SECRET_KEY`, `CLERK_WEBHOOK_SECRET`, `GEMINI_API_KEY`, and `FRONTEND_URL` — the real frontend origin, used for CORS)
+4. Vercel builds with `npm run build` (see `vercel.json`) and auto-deploys on `main` branch pushes
+5. Run `npx prisma migrate deploy` against the production database when migrations change
 
 ## 📝 Scripts
 
@@ -195,6 +197,7 @@ npm start          # Start production server
 - `npm run build` - Compile TypeScript to JavaScript
 - `npm start` - Run production server
 - `npm run lint` - Run ESLint
+- `npm run typecheck` - Type-check src, the Vercel entry point, and the seed
 - `npx prisma studio` - Open Prisma Studio GUI for database
 
 ## 🛠️ Technologies
