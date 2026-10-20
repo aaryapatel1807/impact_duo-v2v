@@ -7,33 +7,38 @@
     "start": "node dist/server.js",
     "dev": "ts-node-dev --respawn --transpile-only src/server.ts",
     "build": "npx prisma generate && npx tsc",
-    "lint": "eslint src --ext .ts",
+    "lint": "eslint src api prisma",
     "prisma:generate": "prisma generate",
-    "prisma:push": "prisma db push"
+    "prisma:push": "prisma db push",
+    "typecheck": "tsc --noEmit -p tsconfig.check.json"
   },
   "prisma": {
-    "seed": "ts-node-dev --transpile-only prisma/seed.ts"
+    "seed": "tsx prisma/seed.ts"
   },
   "dependencies": {
-    "@clerk/clerk-sdk-node": "^5.0.0",
+    "@clerk/express": "^2.1.80",
     "@google/generative-ai": "^0.21.0",
     "@prisma/adapter-pg": "6.19.3",
     "@prisma/client": "6.19.3",
     "@types/cors": "^2.8.17",
-    "@types/express": "^5.0.0",
+    "@types/express": "^4.17.25",
     "@types/node": "^22.10.2",
     "@types/pg": "^8.11.10",
     "cors": "^2.8.5",
     "dotenv": "^16.4.7",
     "express": "^4.21.2",
+    "express-rate-limit": "^8.7.1",
+    "helmet": "^8.3.0",
     "pg": "^8.13.1",
     "prisma": "6.19.3",
     "svix": "^1.40.0",
+    "tsx": "^4.23.15",
     "typescript": "^5.7.2",
     "zod": "^3.24.1"
   },
   "devDependencies": {
-    "ts-node-dev": "^2.0.0"
+    "eslint": "^10.13.0",
+    "ts-node-dev": "^2.0.0",
+    "typescript-eslint": "^8.72.0"
   }
 }
-

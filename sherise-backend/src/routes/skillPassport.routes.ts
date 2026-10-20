@@ -1,29 +1,31 @@
 import { Router } from 'express';
 import { z } from 'zod';
-import { GoogleGenerativeAI } from '@google/generative-ai';
 import { prisma } from '../lib/prisma';
 import { requireAuth, AuthRequest } from '../middleware/auth';
 
 const router = Router();
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || '');
+
+// NOTE: content generation here is template-based (see /generate below).
+// This file previously imported and instantiated GoogleGenerativeAI without
+// ever calling it, while the docs promised AI-generated content.
 
 const skillEntrySchema = z.object({
-  lifeRole: z.string(),
-  mappedSkill: z.string(),
-  justification: z.string(),
+  lifeRole: z.string().min(1).max(100),
+  mappedSkill: z.string().min(1).max(200),
+  justification: z.string().min(1).max(1000),
 });
 
 const skillPassportSchema = z.object({
-  skills: z.array(skillEntrySchema),
+  skills: z.array(skillEntrySchema).max(50),
   generatedContent: z.object({
-    resumeSummary: z.string(),
-    bio: z.string(),
-    elevatorPitch: z.string(),
+    resumeSummary: z.string().min(1).max(5000),
+    bio: z.string().min(1).max(5000),
+    elevatorPitch: z.string().min(1).max(5000),
   }),
 });
 
 const generateSkillPassportSchema = z.object({
-  selectedRoles: z.array(z.string()),
+  selectedRoles: z.array(z.string().min(1).max(50)).min(1).max(20),
 });
 
 // GET /api/skill-passport
@@ -48,7 +50,7 @@ router.get('/', requireAuth, async (req: AuthRequest, res) => {
     console.error('Error fetching skill passport:', error);
     return res.status(500).json({
       success: false,
-      error: error instanceof Error ? error.message : 'Failed to fetch skill passport',
+      error: 'Failed to fetch skill passport',
     });
   }
 });
@@ -58,24 +60,30 @@ router.post('/', requireAuth, async (req: AuthRequest, res) => {
   try {
     const validatedData = skillPassportSchema.parse(req.body);
 
-    await prisma.skillPassportEntry.deleteMany({
-      where: { userId: req.user!.id },
-    });
+    // Delete + recreate + upsert must be atomic: as separate awaits, a
+    // failure after the delete permanently wiped the user's skill passport.
+    const [skillEntries, generatedContent] = await prisma.$transaction(async (tx) => {
+      await tx.skillPassportEntry.deleteMany({
+        where: { userId: req.user!.id },
+      });
 
-    const skillEntries = await prisma.skillPassportEntry.createMany({
-      data: validatedData.skills.map((skill) => ({
-        userId: req.user!.id,
-        ...skill,
-      })),
-    });
+      const entries = await tx.skillPassportEntry.createMany({
+        data: validatedData.skills.map((skill) => ({
+          userId: req.user!.id,
+          ...skill,
+        })),
+      });
 
-    const generatedContent = await prisma.generatedContent.upsert({
-      where: { userId: req.user!.id },
-      create: {
-        userId: req.user!.id,
-        ...validatedData.generatedContent,
-      },
-      update: validatedData.generatedContent,
+      const content = await tx.generatedContent.upsert({
+        where: { userId: req.user!.id },
+        create: {
+          userId: req.user!.id,
+          ...validatedData.generatedContent,
+        },
+        update: validatedData.generatedContent,
+      });
+
+      return [entries, content] as const;
     });
 
     return res.json({
@@ -95,7 +103,7 @@ router.post('/', requireAuth, async (req: AuthRequest, res) => {
     console.error('Error saving skill passport:', error);
     return res.status(500).json({
       success: false,
-      error: error instanceof Error ? error.message : 'Failed to save skill passport',
+      error: 'Failed to save skill passport',
     });
   }
 });
@@ -166,32 +174,35 @@ router.post('/generate', requireAuth, async (req: AuthRequest, res) => {
       });
     }
 
-    // Save skill entries
-    await prisma.skillPassportEntry.deleteMany({
-      where: { userId: req.user!.id },
-    });
-
-    await prisma.skillPassportEntry.createMany({
-      data: mappedSkills.map((skill) => ({
-        userId: req.user!.id,
-        ...skill,
-      })),
-    });
-
-    // Generate content with AI (or use fallback)
-    const fallbackContent = {
+    // Build the content from templates (deterministic; no AI call is made —
+    // docs/UI copy should describe it that way)
+    const templateContent = {
       resumeSummary: `Resourceful professional with hands-on experience in ${mappedSkills.map((s) => s.mappedSkill).join(' and ').toLowerCase()}. Proven track record of managing complex responsibilities.`,
       bio: `I'm a dedicated professional who has built valuable expertise through real-world experience. My background has taught me ${mappedSkills[0]?.mappedSkill.toLowerCase()}, effective communication, and adaptability.`,
       elevatorPitch: `I've spent years managing responsibilities, solving problems, and delivering results. I bring experience in ${mappedSkills[0]?.mappedSkill.toLowerCase()} and a proven ability to learn quickly.`,
     };
 
-    const generatedContent = await prisma.generatedContent.upsert({
-      where: { userId: req.user!.id },
-      create: {
-        userId: req.user!.id,
-        ...fallbackContent,
-      },
-      update: fallbackContent,
+    // Save entries + content atomically (same wipe risk as POST / above)
+    const generatedContent = await prisma.$transaction(async (tx) => {
+      await tx.skillPassportEntry.deleteMany({
+        where: { userId: req.user!.id },
+      });
+
+      await tx.skillPassportEntry.createMany({
+        data: mappedSkills.map((skill) => ({
+          userId: req.user!.id,
+          ...skill,
+        })),
+      });
+
+      return tx.generatedContent.upsert({
+        where: { userId: req.user!.id },
+        create: {
+          userId: req.user!.id,
+          ...templateContent,
+        },
+        update: templateContent,
+      });
     });
 
     return res.json({
@@ -200,10 +211,18 @@ router.post('/generate', requireAuth, async (req: AuthRequest, res) => {
       generatedContent,
     });
   } catch (error) {
+    if (error instanceof z.ZodError) {
+      return res.status(400).json({
+        success: false,
+        error: 'Validation error',
+        details: error.issues,
+      });
+    }
+
     console.error('Error generating skill passport:', error);
     return res.status(500).json({
       success: false,
-      error: error instanceof Error ? error.message : 'Failed to generate skill passport',
+      error: 'Failed to generate skill passport',
     });
   }
 });

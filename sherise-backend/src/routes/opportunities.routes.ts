@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { prisma } from '../lib/prisma';
 import { requireAuth, AuthRequest } from '../middleware/auth';
+import { meetsEducationRequirement } from '../lib/education';
 
 const router = Router();
 
@@ -27,28 +28,21 @@ interface OpportunityWithMatch {
   missingCriteria: string[];
 }
 
-// Education level hierarchy (lowest to highest)
-const EDUCATION_LEVELS = [
-  'Primary (Grade 1-5)',
-  'Middle School (Grade 6-8)',
-  'High School (Grade 9-10)',
-  'Higher Secondary (Grade 11-12)',
-  'Diploma/Certificate',
-  'Bachelor\'s Degree',
-  'Master\'s Degree',
-  'Doctorate'
-];
+// Education hierarchy + requirement check live in ../lib/education — the one
+// canonical vocabulary shared with the profile schema and the seed data.
 
-function getEducationIndex(level: string): number {
-  return EDUCATION_LEVELS.indexOf(level);
+// Split free text into a set of whole words, so tag matching works on word
+// boundaries instead of substrings (previously "ai" matched "tailoring", and
+// an empty token from a trailing comma matched every tag).
+function wordSet(text: string): Set<string> {
+  return new Set(
+    text.toLowerCase().split(/[^a-z0-9]+/).filter(Boolean)
+  );
 }
 
-function meetsEducationRequirement(userEducation: string, requiredLevels: string[]): boolean {
-  const userIndex = getEducationIndex(userEducation);
-  return requiredLevels.some(required => {
-    const requiredIndex = getEducationIndex(required);
-    return userIndex >= requiredIndex;
-  });
+function tagMatchesUser(tag: string, userWords: Set<string>): boolean {
+  const tagWords = tag.toLowerCase().split(/[^a-z0-9]+/).filter(Boolean);
+  return tagWords.length > 0 && tagWords.every((word) => userWords.has(word));
 }
 
 function calculateOpportunityMatch(
@@ -82,17 +76,12 @@ function calculateOpportunityMatch(
     missingCriteria.push(`Region: ${opportunity.region.join(' or ')}`);
   }
 
-  // Skills/interests matching (at least 1 tag should match)
+  // Skills/interests matching (at least 1 tag should match, on whole words)
   if (opportunity.tags.length > 0) {
-    const userSkills = profile.skills.toLowerCase().split(',').map((s: string) => s.trim());
-    const userInterests = profile.interests.toLowerCase().split(',').map((i: string) => i.trim());
-    const userTokens = [...userSkills, ...userInterests];
+    const userWords = wordSet(`${profile.skills}, ${profile.interests}`);
 
     const hasMatchingTag = opportunity.tags.some((tag: string) =>
-      userTokens.some(token =>
-        token.includes(tag.toLowerCase()) ||
-        tag.toLowerCase().includes(token)
-      )
+      tagMatchesUser(tag, userWords)
     );
 
     if (!hasMatchingTag) {
@@ -125,7 +114,7 @@ router.get('/', requireAuth, async (req: AuthRequest, res) => {
     console.error('Error fetching opportunities:', error);
     return res.status(500).json({
       success: false,
-      error: error instanceof Error ? error.message : 'Failed to fetch opportunities',
+      error: 'Failed to fetch opportunities',
     });
   }
 });
@@ -162,6 +151,7 @@ router.post('/match', requireAuth, async (req: AuthRequest, res) => {
     };
 
     // Calculate matches for each opportunity
+    const matchUpserts = [];
     for (const opportunity of opportunities) {
       const match = calculateOpportunityMatch(opportunity, profile, currentStepIndex);
 
@@ -173,8 +163,7 @@ router.post('/match', requireAuth, async (req: AuthRequest, res) => {
 
       matchResults[match.status as keyof MatchResult].push(opportunityWithMatch);
 
-      // Save/update the match in the database
-      await prisma.opportunityMatch.upsert({
+      matchUpserts.push(prisma.opportunityMatch.upsert({
         where: {
           userId_opportunityId: {
             userId: req.user!.id,
@@ -192,16 +181,29 @@ router.post('/match', requireAuth, async (req: AuthRequest, res) => {
           status: match.status,
           missingCriteria: match.missingCriteria
         }
-      });
+      }));
     }
 
-    // Sort each category by relevance
+    // Persist all matches atomically (previously a sequential await per
+    // opportunity left partial match state behind on any mid-loop failure)
+    if (matchUpserts.length > 0) {
+      await prisma.$transaction(matchUpserts);
+    }
+
+    // Sort eligible by deadline proximity. Deadlines are free text in the
+    // data ('Ongoing', 'March 2026', ...), so unparseable/missing deadlines
+    // sort last instead of producing NaN comparisons; ties break on type
+    // (scholarships first) then title, keeping the order total and stable.
+    const deadlineTime = (o: OpportunityWithMatch): number => {
+      const t = o.deadline ? Date.parse(o.deadline) : Number.NaN;
+      return Number.isNaN(t) ? Number.POSITIVE_INFINITY : t;
+    };
     matchResults.eligible.sort((a, b) => {
-      // Prioritize by deadline proximity and type
-      if (a.deadline && b.deadline) {
-        return new Date(a.deadline).getTime() - new Date(b.deadline).getTime();
-      }
-      return a.type === 'scholarship' ? -1 : 1;
+      const byDeadline = deadlineTime(a) - deadlineTime(b);
+      if (byDeadline !== 0) return byDeadline;
+      const byType = (a.type === 'scholarship' ? 0 : 1) - (b.type === 'scholarship' ? 0 : 1);
+      if (byType !== 0) return byType;
+      return a.title.localeCompare(b.title);
     });
 
     matchResults.almost.sort((a, b) => a.missingCriteria.length - b.missingCriteria.length);
@@ -225,7 +227,7 @@ router.post('/match', requireAuth, async (req: AuthRequest, res) => {
     console.error('Error matching opportunities:', error);
     return res.status(500).json({
       success: false,
-      error: error instanceof Error ? error.message : 'Failed to match opportunities',
+      error: 'Failed to match opportunities',
     });
   }
 });

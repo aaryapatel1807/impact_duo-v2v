@@ -61,7 +61,7 @@ async function main() {
       region: ['India', 'Global'],
       minAge: 18,
       maxAge: 35,
-      minEducation: ['Higher Secondary (Grade 11-12)', 'Some College', 'Bachelor Degree'],
+      minEducation: ['Higher Secondary (Grade 11-12)', 'Some College', "Bachelor's Degree"],
       tags: ['technology', 'education', 'STEM', 'online-learning'],
       url: 'https://wie.ieee.org',
       deadline: 'March 2026',
@@ -87,7 +87,7 @@ async function main() {
       region: ['Global'],
       minAge: 18,
       maxAge: null,
-      minEducation: ['Higher Secondary (Grade 11-12)', 'Some College', "Bachelor Degree"],
+      minEducation: ['Higher Secondary (Grade 11-12)', 'Some College', "Bachelor's Degree"],
       tags: ['writing', 'communication', 'remote-work', 'tutoring', 'education'],
       url: 'https://upwork.com',
       deadline: null,
@@ -126,7 +126,7 @@ async function main() {
       region: ['India'],
       minAge: 21,
       maxAge: null,
-      minEducation: ['Higher Secondary (Grade 11-12)', 'Some College', "Bachelor Degree"],
+      minEducation: ['Higher Secondary (Grade 11-12)', 'Some College', "Bachelor's Degree"],
       tags: ['tutoring', 'education', 'teaching', 'remote-work', 'communication'],
       url: 'https://careers.vedantu.com',
       deadline: null,
@@ -139,7 +139,7 @@ async function main() {
       region: ['India'],
       minAge: 21,
       maxAge: null,
-      minEducation: ['Higher Secondary (Grade 11-12)', 'Some College', "Bachelor Degree"],
+      minEducation: ['Higher Secondary (Grade 11-12)', 'Some College', "Bachelor's Degree"],
       tags: ['entrepreneurship', 'startup', 'mentorship', 'funding', 'small-business'],
       url: 'https://wep.gov.in',
       deadline: 'Ongoing',
@@ -152,7 +152,7 @@ async function main() {
       region: ['Global'],
       minAge: 16,
       maxAge: null,
-      minEducation: ['Secondary (Grade 9-10)', 'Higher Secondary (Grade 11-12)', 'Some College', "Bachelor Degree"],
+      minEducation: ['Secondary (Grade 9-10)', 'Higher Secondary (Grade 11-12)', 'Some College', "Bachelor's Degree"],
       tags: ['online-learning', 'technology', 'business', 'education', 'certification'],
       url: 'https://www.coursera.org/financial-aid',
       deadline: 'Apply anytime',
@@ -204,7 +204,7 @@ async function main() {
       region: ['India'],
       minAge: 18,
       maxAge: null,
-      minEducation: ['Secondary (Grade 9-10)', 'Higher Secondary (Grade 11-12)', 'Some College', "Bachelor Degree"],
+      minEducation: ['Secondary (Grade 9-10)', 'Higher Secondary (Grade 11-12)', 'Some College', "Bachelor's Degree"],
       tags: ['entrepreneurship', 'financing', 'manufacturing', 'small-business', 'government'],
       url: 'https://www.standupmitra.in',
       deadline: 'Ongoing',
@@ -250,13 +250,22 @@ async function main() {
     },
   ];
 
+  // Idempotent: skip opportunities that already exist (title + organization),
+  // so re-running the seed never duplicates them.
+  let createdCount = 0;
   for (const opp of opportunities) {
-    await prisma.opportunity.create({
-      data: opp,
+    const existing = await prisma.opportunity.findFirst({
+      where: { title: opp.title, organization: opp.organization },
     });
+    if (!existing) {
+      await prisma.opportunity.create({
+        data: opp,
+      });
+      createdCount++;
+    }
   }
 
-  console.log(`✅ Created/updated ${opportunities.length} opportunities`);
+  console.log(`✅ Seeded ${opportunities.length} opportunities (${createdCount} newly created)`);
   console.log('\n🎉 Seed completed successfully!');
   console.log('\n📊 Verification steps:');
   console.log('1. Run: npx prisma studio');

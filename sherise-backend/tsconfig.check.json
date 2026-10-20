@@ -1,0 +1,1 @@
+{"compilerOptions":{"noEmit":true,"outDir":"node_modules/.cache/tscheck","rootDir":"."},"exclude":["node_modules","dist"],"extends":"./tsconfig.json","include":["src/**/*","api/**/*","prisma/seed.ts"]}

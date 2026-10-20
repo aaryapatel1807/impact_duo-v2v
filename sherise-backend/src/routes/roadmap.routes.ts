@@ -7,17 +7,24 @@ import { requireAuth, AuthRequest } from '../middleware/auth';
 const router = Router();
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || '');
 
+// The Gemini model is configurable via env because model ids get retired:
+// this route previously hardcoded 'gemini-2.0-flash', which Google shut down
+// on 1 Jun 2026, killing the route. Default is the current GA Flash model —
+// override with GEMINI_MODEL instead of editing code next retirement.
+const GEMINI_MODEL = process.env.GEMINI_MODEL || 'gemini-3.8-flash';
+const GEMINI_TIMEOUT_MS = 50_000; // stay inside Vercel's 60s function cap
+
 const roadmapStepSchema = z.object({
-  title: z.string(),
-  description: z.string(),
-  icon: z.string(),
+  title: z.string().min(1).max(200),
+  description: z.string().min(1).max(2000),
+  icon: z.string().max(16),
   status: z.enum(['completed', 'current', 'future']),
 });
 
 const roadmapSchema = z.object({
-  currentSituation: z.string(),
-  steps: z.array(roadmapStepSchema),
-  timelineMonths: z.string(),
+  currentSituation: z.string().min(1).max(1000),
+  steps: z.array(roadmapStepSchema).min(1).max(20),
+  timelineMonths: z.string().min(1).max(100),
 });
 
 // GET /api/roadmap - Get user's roadmap
@@ -36,22 +43,34 @@ router.get('/', requireAuth, async (req: AuthRequest, res) => {
     console.error('Error fetching roadmap:', error);
     return res.status(500).json({
       success: false,
-      error: error instanceof Error ? error.message : 'Failed to fetch roadmap',
+      error: 'Failed to fetch roadmap',
     });
   }
 });
 
-// POST /api/roadmap - Create roadmap
+// POST /api/roadmap - Create or update the user's roadmap (one active
+// roadmap per user; previously every call created another duplicate row
+// while GET only ever read the newest)
 router.post('/', requireAuth, async (req: AuthRequest, res) => {
   try {
     const validatedData = roadmapSchema.parse(req.body);
 
-    const roadmap = await prisma.roadmap.create({
-      data: {
-        userId: req.user!.id,
-        ...validatedData,
-      },
+    const existing = await prisma.roadmap.findFirst({
+      where: { userId: req.user!.id },
+      orderBy: { createdAt: 'desc' },
     });
+
+    const roadmap = existing
+      ? await prisma.roadmap.update({
+          where: { id: existing.id },
+          data: validatedData,
+        })
+      : await prisma.roadmap.create({
+          data: {
+            userId: req.user!.id,
+            ...validatedData,
+          },
+        });
 
     return res.json({
       success: true,
@@ -69,7 +88,7 @@ router.post('/', requireAuth, async (req: AuthRequest, res) => {
     console.error('Error saving roadmap:', error);
     return res.status(500).json({
       success: false,
-      error: error instanceof Error ? error.message : 'Failed to save roadmap',
+      error: 'Failed to save roadmap',
     });
   }
 });
@@ -113,8 +132,8 @@ router.post('/generate', requireAuth, async (req: AuthRequest, res) => {
       });
     }
 
-    // Initialize Gemini AI
-    const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash' });
+    // Initialize Gemini AI (model id from env — see GEMINI_MODEL above)
+    const model = genAI.getGenerativeModel({ model: GEMINI_MODEL });
 
     // Create comprehensive prompt
     const prompt = `You are an AI career advisor specializing in helping women restart their careers after gaps.
@@ -148,13 +167,19 @@ Return ONLY valid JSON (no markdown, no code blocks) in this exact format:
 
 Make it personal, encouraging, and actionable. Focus on building confidence and skills progressively.`;
 
-    // Call Gemini AI
+    // Call Gemini AI (with a timeout so a hung call cannot ride out the
+    // whole serverless function window)
     console.log('Calling Gemini API...');
-    const result = await model.generateContent(prompt);
+    const result = await Promise.race([
+      model.generateContent(prompt),
+      new Promise<never>((_, reject) =>
+        setTimeout(() => reject(new Error('AI generation timed out. Please try again.')), GEMINI_TIMEOUT_MS)
+      ),
+    ]);
     const response = result.response;
     const text = response.text();
-    
-    console.log('Gemini Response received:', text.substring(0, 200));
+
+    console.log(`Gemini response received (${text.length} chars)`);
 
     // Clean response (remove markdown code blocks if present)
     let cleanedText = text.trim();
@@ -170,6 +195,10 @@ Make it personal, encouraging, and actionable. Focus on building confidence and 
       aiRoadmap = JSON.parse(cleanedText);
     } catch (parseError) {
       console.error('Failed to parse AI response:', cleanedText);
+      throw new Error('AI returned invalid format. Please try again.');
+    }
+
+    if (!aiRoadmap || !Array.isArray(aiRoadmap.steps)) {
       throw new Error('AI returned invalid format. Please try again.');
     }
 
@@ -205,18 +234,23 @@ Make it personal, encouraging, and actionable. Focus on building confidence and 
       source: 'ai',
     });
   } catch (error) {
+    // Full error (including stack) stays in the server logs only — it used
+    // to be returned to the client in `details`, leaking internals.
     console.error('Error generating roadmap:', error);
-    
-    // Return specific error messages
-    let errorMessage = 'Failed to generate roadmap';
-    if (error instanceof Error) {
-      errorMessage = error.message;
-    }
+
+    // Only messages written for users in this handler are safe to surface;
+    // anything else (Gemini/Prisma internals) becomes a generic message.
+    const safeMessages = [
+      'AI returned invalid format. Please try again.',
+      'AI generation timed out. Please try again.',
+    ];
+    const errorMessage = error instanceof Error && safeMessages.includes(error.message)
+      ? error.message
+      : 'Failed to generate roadmap';
 
     return res.status(500).json({
       success: false,
       error: errorMessage,
-      details: error instanceof Error ? error.stack : undefined,
     });
   }
 });
