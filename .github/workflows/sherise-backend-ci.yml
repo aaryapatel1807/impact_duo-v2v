@@ -1,0 +1,48 @@
+name: SheRise Backend CI
+
+on:
+  push:
+    paths:
+      - 'sherise-backend/**'
+      - '.github/workflows/sherise-backend-ci.yml'
+  pull_request:
+    paths:
+      - 'sherise-backend/**'
+      - '.github/workflows/sherise-backend-ci.yml'
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: sherise-backend
+    env:
+      # Dummy value so Prisma can load the schema; no database is contacted.
+      DATABASE_URL: postgresql://user:pass@localhost:5432/db
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: sherise-backend/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Generate Prisma client
+        run: npx prisma generate
+
+      - name: Type-check (src, Vercel entry, seed)
+        run: npm run typecheck
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Build
+        run: npm run build
+
+      - name: Dependency audit (report only)
+        run: npm audit --audit-level=high
+        continue-on-error: true
